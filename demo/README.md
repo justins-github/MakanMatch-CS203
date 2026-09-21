@@ -19,7 +19,7 @@ npm run dev
 
 Open http://localhost:203 (port 203 for CS203). `npm run dev` starts both halves via
 `concurrently`: the Express API on :3001 (auto-restarted by **nodemon**) and the Vite
-React app on :203 (hot reload). `npm test` runs the match-engine tests (`node --test`).
+React app on :5203 (hot reload). `npm test` runs the match-engine tests (`node --test`).
 
 ## What each screen demonstrates
 
