@@ -468,6 +468,11 @@ body {
   gap: 8px;
 }
 
+.header-actions {
+  display: flex;
+  gap: 6px;
+}
+
 .reset-btn {
   appearance: none;
   border: 1.5px solid var(--ink-soft);

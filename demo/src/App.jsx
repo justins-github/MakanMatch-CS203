@@ -3,10 +3,24 @@ import { getContext, getRecommendations, postReset } from './api.js'
 import ContextBanner from './components/ContextBanner.jsx'
 import Feed from './components/Feed.jsx'
 import MoodBar from './components/MoodBar.jsx'
+import Login from './components/Login.jsx'
 import Review from './components/Review.jsx'
 import TasteDna from './components/TasteDna.jsx'
 
+const USER_KEY = 'mm-demo-user'
+
+function loadUser() {
+  try {
+    return JSON.parse(sessionStorage.getItem(USER_KEY)) || null
+  } catch {
+    return null
+  }
+}
+
 export default function App() {
+  // Mock auth: no backend yet, so Login accepts anything. Kept in
+  // sessionStorage so a page refresh doesn't bounce you back to sign-in.
+  const [user, setUser] = useState(loadUser)
   const [tab, setTab] = useState('feed')
   const [mode, setMode] = useState('idle') // idle | find | surprise
   const [mood, setMood] = useState('none')
@@ -19,16 +33,16 @@ export default function App() {
 
   // Idle landing still shows the live weather banner.
   useEffect(() => {
-    if (tab !== 'feed' || mode !== 'idle') return
+    if (!user || tab !== 'feed' || mode !== 'idle') return
     let cancelled = false
     getContext(simRain)
       .then((c) => { if (!cancelled) setContext(c) })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [tab, mode, simRain, resetCount])
+  }, [user, tab, mode, simRain, resetCount])
 
   useEffect(() => {
-    if (tab !== 'feed' || mode === 'idle') return
+    if (!user || tab !== 'feed' || mode === 'idle') return
     let cancelled = false
     setError(null)
     getRecommendations(mode, mood, simRain, exclude)
@@ -39,7 +53,7 @@ export default function App() {
       })
       .catch((err) => { if (!cancelled) setError(err.message) })
     return () => { cancelled = true }
-  }, [mode, mood, simRain, exclude, tab, resetCount])
+  }, [user, mode, mood, simRain, exclude, tab, resetCount])
 
   const startMode = (next) => {
     setRecs(null)
@@ -65,6 +79,26 @@ export default function App() {
     setResetCount((n) => n + 1) // re-fetches feed and remounts the other tabs
   }
 
+  const login = (u) => {
+    try { sessionStorage.setItem(USER_KEY, JSON.stringify(u)) } catch {}
+    setUser(u)
+  }
+
+  const logout = () => {
+    try { sessionStorage.removeItem(USER_KEY) } catch {}
+    setUser(null)
+    setTab('feed')
+    backToLanding()
+  }
+
+  if (!user) {
+    return (
+      <div className="phone">
+        <Login onLogin={login} />
+      </div>
+    )
+  }
+
   const TABS = [
     ['feed', 'For you'],
     ['rate', 'Review'],
@@ -76,9 +110,14 @@ export default function App() {
       <header className="header">
         <div className="header-top">
           <div className="eyebrow">The AI that learns your taste - team demo</div>
-          <button className="reset-btn" onClick={resetDemo}>
-            Reset demo
-          </button>
+          <div className="header-actions">
+            <button className="reset-btn" onClick={resetDemo}>
+              Reset demo
+            </button>
+            <button className="reset-btn" onClick={logout} title={user.email}>
+              Log out
+            </button>
+          </div>
         </div>
         <h1>
           Makan<span className="accent">Match</span>
