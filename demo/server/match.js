@@ -60,6 +60,16 @@ function scoreVenue(venue, user, context) {
     if (pricePenalty > 0) why.push('Pricier than your usual')
   }
 
+  // Learned taste: cosine between the user's taste vector and the venue's prior vector.
+  // Fires only when both exist; unrelated venues sit around 0.4, close ones above 0.75.
+  const sim = context.taste?.vector && venue.gersId
+    ? context.taste.store.similarity(venue.gersId, context.taste.vector)
+    : null
+  if (sim != null) {
+    score += 12 * Math.max(0, Math.min(1, (sim - 0.4) / 0.5))
+    if (sim >= 0.75) why.push("Similar to places you've rated well")
+  }
+
   score -= Math.min(12, venue.distanceMin * 0.8)
   why.push(`${venue.distanceMin} min walk`)
 
@@ -128,10 +138,11 @@ function confidenceFor(venue) {
 export function rankVenues(venues, user, context = {}) {
   const mood = MOODS.includes(context.mood) ? context.mood : 'none'
   const raining = Boolean(context.raining)
+  const taste = context.taste?.store && context.taste.vector ? context.taste : null
 
   return venues
     .map((venue) => {
-      const { score, why } = scoreVenue(venue, user, { raining, mood })
+      const { score, why } = scoreVenue(venue, user, { raining, mood, taste })
       return {
         ...venue,
         matchScore: score,

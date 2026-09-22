@@ -163,3 +163,39 @@ test('pickSurprise honors exclusions and never picks unknown-cuisine venues', ()
   const none = pickSurprise([mystery], DEMO_USER, CTX)
   assert.equal(none, null)
 })
+
+// --- taste-vector similarity term ---------------------------------------------
+import { createStore, quantise } from './vectors.js'
+
+function tasteStore() {
+  const unit = (arr) => { const n = Math.hypot(...arr); return Float32Array.from(arr, (x) => x / n) }
+  const dim = 3
+  const rows = { near: unit([1, 0.1, 0]), far: unit([0, 0, 1]) }
+  const ids = Object.keys(rows)
+  const bin = new Int8Array(dim * ids.length)
+  ids.forEach((id, i) => bin.set(quantise(rows[id]), i * dim))
+  return { store: createStore({ dim, ids, model: 'test' }, bin), vector: unit([1, 0, 0]) }
+}
+
+test('a venue close to the taste vector scores higher and gets the similarity chip', () => {
+  const taste = tasteStore()
+  const near = makeBare({ id: 'n', gersId: 'near' })
+  const far = makeBare({ id: 'f', gersId: 'far' })
+  const [top, bottom] = rankVenues([far, near], DEMO_USER, { ...CTX, taste })
+  assert.equal(top.id, 'n')
+  assert.ok(top.matchScore > bottom.matchScore)
+  assert.ok(top.why.includes("Similar to places you've rated well"))
+  assert.ok(!bottom.why.includes("Similar to places you've rated well"))
+})
+
+test('the similarity term stays silent without a taste vector or without a venue vector', () => {
+  const taste = tasteStore()
+  const near = makeBare({ id: 'n', gersId: 'near' })
+  const unknown = makeBare({ id: 'u', gersId: 'not-in-store' })
+  const [plain] = rankVenues([near], DEMO_USER, CTX)
+  const [noVector] = rankVenues([near], DEMO_USER, { ...CTX, taste: { store: taste.store, vector: null } })
+  const [notInStore] = rankVenues([unknown], DEMO_USER, { ...CTX, taste })
+  assert.equal(plain.matchScore, noVector.matchScore)
+  assert.equal(plain.matchScore, notInStore.matchScore)
+  for (const v of [plain, noVector, notInStore]) assert.ok(!v.why.some((w) => w.startsWith('Similar')))
+})
