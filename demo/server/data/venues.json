@@ -14,7 +14,9 @@
     "novelty": 0.6,
     "reviewCount": 23,
     "dataAgeDays": 20,
-    "signature": "Chicken doner wrap"
+    "signature": "Chicken doner wrap",
+    "latitude": 1.3006,
+    "longitude": 103.8494
   },
   {
     "id": "bedok-chwee-kueh",
@@ -31,7 +33,9 @@
     "novelty": 0.3,
     "reviewCount": 58,
     "dataAgeDays": 8,
-    "signature": "Chwee kueh with chye poh"
+    "signature": "Chwee kueh with chye poh",
+    "latitude": 1.3247,
+    "longitude": 103.9340
   },
   {
     "id": "jefri-botak",
@@ -48,7 +52,9 @@
     "novelty": 0.2,
     "reviewCount": 41,
     "dataAgeDays": 15,
-    "signature": "Roasted chicken rice"
+    "signature": "Roasted chicken rice",
+    "latitude": 1.3247,
+    "longitude": 103.9340
   },
   {
     "id": "inspirasi",
@@ -65,7 +71,9 @@
     "novelty": 0.5,
     "reviewCount": 34,
     "dataAgeDays": 30,
-    "signature": "Mee rebus special"
+    "signature": "Mee rebus special",
+    "latitude": 1.3247,
+    "longitude": 103.9340
   },
   {
     "id": "moona-thai",
@@ -82,7 +90,9 @@
     "novelty": 0.7,
     "reviewCount": 12,
     "dataAgeDays": 45,
-    "signature": "Tom yum goong"
+    "signature": "Tom yum goong",
+    "latitude": 1.3220,
+    "longitude": 103.9480
   },
   {
     "id": "bedok-fish-soup",
@@ -99,7 +109,9 @@
     "novelty": 0.4,
     "reviewCount": 19,
     "dataAgeDays": 60,
-    "signature": "Sliced batang fish soup"
+    "signature": "Sliced batang fish soup",
+    "latitude": 1.3210,
+    "longitude": 103.9495
   },
   {
     "id": "selegie-soto",
@@ -116,7 +128,9 @@
     "novelty": 0.5,
     "reviewCount": 9,
     "dataAgeDays": 90,
-    "signature": "Soto ayam with begedil"
+    "signature": "Soto ayam with begedil",
+    "latitude": 1.3015,
+    "longitude": 103.8505
   },
   {
     "id": "rochor-prata",
@@ -133,7 +147,9 @@
     "novelty": 0.3,
     "reviewCount": 47,
     "dataAgeDays": 12,
-    "signature": "Egg prata with fish curry"
+    "signature": "Egg prata with fish curry",
+    "latitude": 1.3032,
+    "longitude": 103.8519
   },
   {
     "id": "awash-ethiopian",
@@ -150,7 +166,9 @@
     "novelty": 0.95,
     "reviewCount": 4,
     "dataAgeDays": 150,
-    "signature": "Injera platter for two"
+    "signature": "Injera platter for two",
+    "latitude": 1.3060,
+    "longitude": 103.8540
   },
   {
     "id": "yangon-flavours",
@@ -167,6 +185,8 @@
     "novelty": 0.85,
     "reviewCount": 6,
     "dataAgeDays": 180,
-    "signature": "Mohinga fish noodle soup"
+    "signature": "Mohinga fish noodle soup",
+    "latitude": 1.3280,
+    "longitude": 103.9310
   }
 ]
