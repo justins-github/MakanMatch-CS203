@@ -11,6 +11,7 @@ CLAUDE.md
 .claude.json
 .mcp.json
 docs/superpowers/
+.idea/
 
 # Generated venue embeddings (regenerate with `node scripts/embed-venues.mjs`)
 demo/server/data/venue_vectors.*
