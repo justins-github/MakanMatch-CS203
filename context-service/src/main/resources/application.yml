@@ -1,0 +1,8 @@
+server:
+  port: 8081
+onemap:
+  base-url: https://www.onemap.gov.sg/api
+  email: ${ONEMAP_EMAIL}
+  password: ${ONEMAP_PASSWORD}
+nea:
+  base-url: https://api-open.data.gov.sg/v2/real-time/api
