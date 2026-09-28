@@ -31,6 +31,10 @@ export default function App() {
   const { status } = useAuth()
   const [screen, setScreen] = useState('login')
 
+  useEffect(() => {
+    if (status === 'signedOut') setScreen('login')
+  }, [status])
+
   if (status === 'loading') {
     return (
       <div className="phone">
