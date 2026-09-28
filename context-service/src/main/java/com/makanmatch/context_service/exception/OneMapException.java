@@ -1,8 +1,12 @@
 package com.makanmatch.context_service.exception;
 
-public class OneMapException extends RuntimeException{
-    OneMapException(String error_message, Throwable cause ) {
-        super(error_message, cause);
+public class OneMapException extends RuntimeException {
 
+    public OneMapException(String message) {
+        super(message);
+    }
+
+    public OneMapException(String message, Throwable cause) {
+        super(message, cause);
     }
 }

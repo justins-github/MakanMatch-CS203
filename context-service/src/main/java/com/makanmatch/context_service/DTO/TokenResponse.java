@@ -1,4 +1,8 @@
 package com.makanmatch.context_service.DTO;
 
-public record TokenResponse(String accessToken, String expiryTimestamp) {
-}
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+public record TokenResponse(
+        @JsonProperty("access_token") String accessToken,
+        @JsonProperty("expiry_timestamp") String expiryTimestamp
+) {}
