@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../../auth/AuthContext.jsx'
+import DietaryPicker, { NO_DIETARY_NEEDS, countDietaryNeeds } from './DietaryPicker.jsx'
 import '../login.css'
 
 const PASSWORD_RULE = /^(?=.*[A-Za-z])(?=.*\d).{8,72}$/
@@ -10,6 +11,7 @@ export default function Register({ onHaveAccount }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [dietary, setDietary] = useState(NO_DIETARY_NEEDS)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
 
@@ -25,7 +27,7 @@ export default function Register({ onHaveAccount }) {
     setBusy(true)
     setError(null)
     try {
-      await signup(email.trim(), password, displayName.trim())
+      await signup(email.trim(), password, displayName.trim(), dietary)
     } catch (err) {
       setError(err.message)
       setBusy(false)
@@ -99,6 +101,17 @@ export default function Register({ onHaveAccount }) {
             At least 8 characters, with a letter and a number.
           </small>
         </label>
+
+        <details className="login-diet">
+          <summary>
+            Dietary needs{' '}
+            <span className="login-diet-count">
+              {countDietaryNeeds(dietary) ? `${countDietaryNeeds(dietary)} picked` : 'optional'}
+            </span>
+          </summary>
+          <DietaryPicker value={dietary} onChange={setDietary} />
+          <small className="login-hint">You can change these any time on your profile.</small>
+        </details>
 
         {error && (
           <div className="login-error" role="alert">

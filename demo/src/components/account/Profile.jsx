@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { changePassword, myClaims, updateMe, withdrawClaim } from '../../api/accountApi.js'
 import { useAuth } from '../../auth/AuthContext.jsx'
 import ClaimVenue from './ClaimVenue.jsx'
+import DietaryPicker, { NO_DIETARY_NEEDS, sameDietaryNeeds } from './DietaryPicker.jsx'
 import './account.css'
 
 const ROLE_LABEL = { USER: 'Diner', OWNER: 'Owner', ADMIN: 'Admin' }
@@ -54,6 +55,50 @@ function DetailsForm() {
       <div className="row-actions">
         <button type="submit" className="btn go" disabled={!changed || busy}>
           {busy ? 'Saving…' : 'Save details'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+function DietaryForm() {
+  const { me, reloadMe } = useAuth()
+  const saved = me.dietary ?? NO_DIETARY_NEEDS
+  const [dietary, setDietary] = useState(saved)
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState(null)
+
+  const changed = !sameDietaryNeeds(dietary, saved)
+
+  const save = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    setMessage(null)
+    try {
+      await updateMe({ dietary })
+      await reloadMe()
+      setMessage({ ok: true, text: 'Saved.' })
+    } catch (err) {
+      setMessage({ ok: false, text: err.message })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form className="panel" onSubmit={save}>
+      <div className="panel-title">Dietary needs</div>
+      <DietaryPicker
+        value={dietary}
+        onChange={(next) => {
+          setDietary(next)
+          setMessage(null)
+        }}
+      />
+      {message && <div className={message.ok ? 'ok-note' : 'error'}>{message.text}</div>}
+      <div className="row-actions">
+        <button type="submit" className="btn go" disabled={!changed || busy}>
+          {busy ? 'Saving…' : 'Save dietary needs'}
         </button>
       </div>
     </form>
@@ -200,6 +245,7 @@ export default function Profile() {
         </div>
       </header>
       <DetailsForm />
+      <DietaryForm />
       <Claims />
       <PasswordForm />
     </main>

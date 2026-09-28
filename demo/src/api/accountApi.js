@@ -5,8 +5,8 @@ import { request } from './http.js'
 const COOKIE_CALL = { 'x-requested-with': 'makanmatch' }
 const post = (path, body) => request(path, { method: 'POST', body })
 
-export const signup = (email, password, displayName) =>
-  request('/api/auth/signup', { method: 'POST', body: { email, password, displayName }, auth: false })
+export const signup = (email, password, displayName, dietary) =>
+  request('/api/auth/signup', { method: 'POST', body: { email, password, displayName, dietary }, auth: false })
 export const login = (identifier, password) =>
   request('/api/auth/login', { method: 'POST', body: { identifier, password }, auth: false })
 export const refreshSession = () =>

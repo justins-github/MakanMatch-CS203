@@ -67,6 +67,75 @@
   padding: 10px 12px;
 }
 
+/* ---------- dietary needs picker (sign-up + profile) ---------- */
+
+.diet {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.diet-group {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.diet-group legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-family: var(--font-data);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.diet-group small {
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  color: var(--ink-soft);
+}
+
+.diet-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.diet-chip {
+  appearance: none;
+  min-height: 32px;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 13px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.diet-chip[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* Restrictions are hard rules, so they light up chili red. */
+.diet-group.strict .diet-chip[aria-pressed='true'] {
+  background: var(--chili);
+  border-color: var(--chili);
+}
+
+.diet-chip:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: 2px;
+}
+
 /* Admin "view as" control, sits in the header next to the title. */
 .role-switch {
   display: flex;

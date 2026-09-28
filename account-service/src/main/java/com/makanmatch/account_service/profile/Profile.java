@@ -1,10 +1,21 @@
 package com.makanmatch.account_service.profile;
 
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.Set;
 import java.util.UUID;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+import com.makanmatch.account_service.profile.DietaryNeeds.Preference;
+import com.makanmatch.account_service.profile.DietaryNeeds.Restriction;
+import com.makanmatch.account_service.profile.DietaryNeeds.SpiceLevel;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
@@ -31,6 +42,20 @@ public class Profile {
 
 	@Column(name = "disabled", nullable = false)
 	private boolean disabled;
+
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.ARRAY)
+	@Column(name = "dietary_restrictions", nullable = false)
+	private Restriction[] dietaryRestrictions = {};
+
+	@Enumerated(EnumType.STRING)
+	@JdbcTypeCode(SqlTypes.ARRAY)
+	@Column(name = "dietary_preferences", nullable = false)
+	private Preference[] dietaryPreferences = {};
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "spice_level")
+	private SpiceLevel spiceLevel;
 
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private Instant createdAt;
@@ -65,6 +90,17 @@ public class Profile {
 
 	public void setDisabled(boolean disabled) {
 		this.disabled = disabled;
+	}
+
+	public void changeDietaryNeeds(DietaryNeeds needs) {
+		this.dietaryRestrictions = needs.restrictions().toArray(Restriction[]::new);
+		this.dietaryPreferences = needs.preferences().toArray(Preference[]::new);
+		this.spiceLevel = needs.spiceLevel();
+	}
+
+	public DietaryNeeds getDietaryNeeds() {
+		return new DietaryNeeds(Set.copyOf(Arrays.asList(dietaryRestrictions)),
+				Set.copyOf(Arrays.asList(dietaryPreferences)), spiceLevel);
 	}
 
 	public UUID getId() {

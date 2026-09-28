@@ -110,8 +110,8 @@ export function AuthProvider({ children }) {
     async login(identifier, password) {
       await adoptSession(await accounts.login(identifier, password))
     },
-    async signup(email, password, displayName) {
-      await adoptSession(await accounts.signup(email, password, displayName))
+    async signup(email, password, displayName, dietary) {
+      await adoptSession(await accounts.signup(email, password, displayName, dietary))
     },
     async logout() {
       try {
