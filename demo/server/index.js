@@ -5,6 +5,7 @@ import { dirname, join } from 'path'
 import { rankVenues, pickSurprise } from './match.js'
 import { MAX_WALK_MIN } from './geo.js'
 import { loadRegistry } from './registry.js'
+import { loadVectorStore, userVector, venueScores } from './vectors.js'
 import { searchVenues } from './search.js'
 import { getContext } from './weather.js'
 import {
@@ -25,12 +26,21 @@ import {
 const here = dirname(fileURLToPath(import.meta.url))
 const seedDishes = JSON.parse(readFileSync(join(here, 'data', 'dishes.json'), 'utf8'))
 const { venues, venueById, searchIndex } = loadRegistry()
+const vectorStore = loadVectorStore(join(here, 'data'))
+if (vectorStore.size === 0) console.warn('venue_vectors missing - run `node scripts/embed-venues.mjs`; ranking without the taste-vector term')
+else console.log(`taste vectors: ${vectorStore.size} venues (${vectorStore.model})`)
 
 const allDishes = () => [...seedDishes, ...getUserDishes()]
 const findDish = (id) => allDishes().find((d) => d.id === id)
 const round1 = (v) => Math.round(v * 10) / 10
 
 const MOODS = ['none', 'soupy', 'spicy', 'light']
+
+// Learned taste vector from what the user has ranked so far (null until something scores > 5).
+function tasteContext() {
+  const scores = venueScores(getReviews(), findDish, (id) => venueById.get(id))
+  return { store: vectorStore, vector: userVector(vectorStore, scores) }
+}
 
 // Latest scored review per dish id.
 function latestScoresByDish() {
@@ -82,7 +92,7 @@ app.get('/api/recommendations', async (req, res) => {
   const mode = req.query.mode === 'surprise' ? 'surprise' : 'find'
   const mood = MOODS.includes(req.query.mood) ? req.query.mood : 'none'
   const context = withRainOverride(await getContext(), req)
-  const ctx = { raining: context.raining, mood }
+  const ctx = { raining: context.raining, mood, taste: tasteContext() }
   const nearby = venues.filter((v) => v.distanceMin <= MAX_WALK_MIN)
   if (mode === 'surprise') {
     const exclude = String(req.query.exclude ?? '').split(',').filter(Boolean)

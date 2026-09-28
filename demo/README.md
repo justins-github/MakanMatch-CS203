@@ -6,7 +6,11 @@ dishes trains a live Taste DNA model in front of you, (2) **real data.gov.sg rai
 data re-ranks the feed**, and (3) the venue registry is **~21,700 real Singapore F&B
 places extracted from Overture Maps** (`server/data/sg_food_places.json`, regenerate
 with `node scripts/extract-overture.mjs` from the repo root after each monthly
-release). It is not the real architecture (no Spring Boot, no DB, no auth).
+release), and (4) every venue has a **learned taste vector** (`server/data/venue_vectors.*`,
+gitignored - build once with `node scripts/embed-venues.mjs` from the repo root; ~2 min,
+one-time ~23 MB model download; the server ranks without the term if the files are
+missing). It is not the real architecture (no Spring Boot, no DB, no auth); see
+`../docs/sprint-plan.md` for the plan.
 
 ## Run it
 
@@ -17,9 +21,13 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:203 (port 203 for CS203). `npm run dev` starts both halves via
+Open http://localhost:5203 (5203 for CS203; port 203 itself is privileged on macOS/Linux). `npm run dev` starts both halves via
 `concurrently`: the Express API on :3001 (auto-restarted by **nodemon**) and the Vite
 React app on :5203 (hot reload). `npm test` runs the match-engine tests (`node --test`).
+
+The app opens on a **mock sign-in screen** (`src/components/Login.jsx`). There is no
+auth backend yet, so any email + password signs you in; the session is kept in
+`sessionStorage` and **Log out** in the header returns you to the sign-in screen.
 
 ## What each screen demonstrates
 
@@ -65,10 +73,15 @@ React app on :5203 (hot reload). `npm test` runs the match-engine tests (`node -
 ## How the match score works (one slide's worth)
 
 `score = 50 + 25·cuisineAffinity [+ 15·spiceFit + 10·richnessFit − pricePenalty]ᵂᴴᴱᴺ
-ᴷᴺᴼᵂᴺ − distancePenalty − satiationPenalty ± contextModifiers`, clamped to 5-99 and
+ᴷᴺᴼᵂᴺ + 12·tasteSimilarity − distancePenalty − satiationPenalty ± contextModifiers`, clamped to 5-99 and
 **capped by information**: `cap = 80 + 4·knownAttributes + min(reviews, 5)`. Every
 applied term emits a human-readable chip - the scoring **is** the explanation.
 Novelty (for Surprise me) is computed from cuisine affinity, never hand-authored.
+`tasteSimilarity` is the cosine between the user's taste vector (weighted mean of the
+prior vectors of venues they ranked above 5/10, `server/vectors.js`) and the venue's
+prior vector (MiniLM sentence embedding of name + category + dish gloss, built offline
+by `scripts/embed-venues.mjs`); it fires only when both exist and emits
+"Similar to places you've rated well" above 0.75.
 The ten curated venues in `server/data/venues.json` merge onto their real Overture
 records at startup (`server/registry.js`) and keep their community taste vectors; in
 the real product those come from dish reviews.
