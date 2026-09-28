@@ -71,6 +71,117 @@
   cursor: pointer;
 }
 
+/* ---------- opening hours ---------- */
+
+.hours-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hours-day {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: 6px 8px;
+  align-items: center;
+  border-top: 1.5px dashed var(--ink-soft);
+  padding-top: 8px;
+}
+
+.hours-day-name {
+  font-family: var(--font-data);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.hours-mode {
+  display: flex;
+  gap: 6px;
+}
+
+.hours-mode-btn {
+  appearance: none;
+  flex: 1;
+  border: var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 12.5px;
+  padding: 6px 4px;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.hours-mode-btn[aria-checked='true'] {
+  box-shadow: none;
+  transform: translate(2px, 2px);
+}
+
+.hours-mode-btn.closed[aria-checked='true'] { background: var(--paper-dim); color: var(--ink-soft); }
+.hours-mode-btn.open[aria-checked='true'],
+.hours-mode-btn.allday[aria-checked='true'] { background: var(--pandan); color: var(--paper); }
+
+.hours-sessions {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hours-session {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.hours-session input {
+  border: var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-data);
+  font-size: 13px;
+  padding: 5px 6px;
+}
+
+.hours-hint {
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  color: var(--monsoon);
+}
+
+.hours-remove,
+.hours-add {
+  appearance: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: var(--font-data);
+  color: var(--ink-soft);
+}
+
+.hours-remove {
+  font-size: 13px;
+  padding: 4px 6px;
+}
+
+.hours-add {
+  align-self: flex-start;
+  font-size: 11.5px;
+  padding: 2px 0;
+  text-decoration: underline;
+}
+
+.hours-mode-btn:focus-visible,
+.hours-session input:focus-visible,
+.hours-remove:focus-visible,
+.hours-add:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: 2px;
+}
+
 .menu-list {
   list-style: none;
   margin: 0;
@@ -170,8 +281,132 @@
   outline-offset: 2px;
 }
 
+/* ---------- edit-all price list ---------- */
+
+.price-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.price-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.price-table th {
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  text-align: left;
+  padding: 0 4px 6px;
+}
+
+.price-table td {
+  border-top: 1.5px dashed var(--ink-soft);
+  padding: 7px 4px;
+  vertical-align: middle;
+}
+
+.price-table .price-input {
+  width: 84px;
+}
+
+.price-table .search-input {
+  padding: 6px 8px;
+  font-size: 13.5px;
+}
+
+.price-table-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.price-table-now {
+  font-family: var(--font-data);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.price-table-remove {
+  text-align: center;
+  width: 1%;
+}
+
+.price-table-remove input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--chili);
+}
+
+.price-table tr.changed td,
+.price-table tr.adding td {
+  background: color-mix(in srgb, var(--kunyit) 22%, transparent);
+}
+
+.price-table tr.removing .price-table-name,
+.price-table tr.removing .price-table-now {
+  text-decoration: line-through;
+  color: var(--ink-soft);
+}
+
+/* ---------- menu photo ---------- */
+
+.menu-scan {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.menu-scan-hint {
+  font-family: var(--font-data);
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.menu-scan-busy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-data);
+  font-size: 12.5px;
+}
+
+.menu-scan-busy img,
+.scan-banner img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border: var(--line);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.scan-banner {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border-left: 4px solid var(--pandan);
+  background: var(--paper-dim);
+  padding: 8px 10px;
+}
+
+.scan-banner.sample {
+  border-left-color: var(--kunyit);
+}
+
+.scan-banner p {
+  margin: 0;
+  font-size: 13px;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .status-choice[aria-checked='true'] {
+  .status-choice[aria-checked='true'],
+  .hours-mode-btn[aria-checked='true'] {
     transform: none;
   }
 }

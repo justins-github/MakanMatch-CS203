@@ -1092,6 +1092,25 @@ body {
   border-left-color: var(--kunyit);
 }
 
+/* Owner-set hours; shut venues never reach the feed, so this always reads "open". */
+.hours-line {
+  margin-top: 6px;
+  font-family: var(--font-data);
+  font-size: 12px;
+  color: var(--pandan);
+}
+
+.hours-line::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--pandan);
+  vertical-align: 1px;
+}
+
 .owner-update-label {
   display: block;
   font-family: var(--font-data);

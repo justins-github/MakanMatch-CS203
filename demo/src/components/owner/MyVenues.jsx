@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getVenue } from '../../api/catalogApi.js'
 import { useAuth } from '../../auth/AuthContext.jsx'
 import MenuEditor from './MenuEditor.jsx'
+import OpeningHoursForm from './OpeningHoursForm.jsx'
 import VenueStatusForm from './VenueStatusForm.jsx'
 import './owner.css'
 
@@ -40,6 +41,7 @@ function VenueDetail({ venueId, onBack }) {
         </header>
       )}
       <VenueStatusForm venueId={venueId} />
+      <OpeningHoursForm venueId={venueId} />
       <MenuEditor venueId={venueId} />
     </>
   )
@@ -72,7 +74,7 @@ export default function MyVenues() {
             <button key={v.venueId} className="venue-row" onClick={() => setSelected(v.venueId)}>
               <span className="venue-row-main">
                 <span className="venue-row-name">{v.venueName}</span>
-                <span className="venue-row-meta">Manage status, menu and prices</span>
+                <span className="venue-row-meta">Manage status, hours, menu and prices</span>
               </span>
               <span className="pill approved">Owner</span>
             </button>
