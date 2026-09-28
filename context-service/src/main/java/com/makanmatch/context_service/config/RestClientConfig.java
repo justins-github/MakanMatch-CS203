@@ -16,4 +16,9 @@ public class RestClientConfig {
     RestClient oneMapRestClient(RestClient.Builder oneMapRestClientBuilder) {
         return oneMapRestClientBuilder.build();
     }
+
+    @Bean
+    RestClient neaRestClient(NeaProperties props) {
+        return RestClient.builder().baseUrl(props.baseUrl()).build();
+    }
 }

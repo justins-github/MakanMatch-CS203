@@ -2,7 +2,7 @@
 
 ## Nearby places by walking time
 
-`GET /api/places/nearby?lat=1.3521&lng=103.8198&maxWalkMin=20` returns fixture places whose OneMap walking route is within the requested limit, sorted by actual route time. The response includes `routingStatus` (`complete` or `partial`) and places with `id`, `name`, `lat`, `lng`, and numeric `walkMinutes`.
+`GET /api/places/nearby?lat=1.3521&lng=103.8198&maxWalkMin=20` returns fixture places whose OneMap walking route is within the requested limit, sorted by adjusted route time. The response includes `routingStatus` (`complete` or `partial`), places with `id`, `name`, `lat`, `lng`, `rawWalkMinutes`, and `adjustedWalkMinutes`, and a `weather` summary.
 
 The endpoint accepts Singapore coordinates within latitude 1.13–1.47 and longitude 103.59–104.10. `maxWalkMin` must be an integer from 1 to 60.
 
@@ -15,3 +15,13 @@ curl 'http://localhost:8081/api/places/nearby?lat=1.3521&lng=103.8198&maxWalkMin
 ```
 
 Swagger UI is available at `/swagger-ui/index.html`.
+
+## Weather context and rain-adjusted walking time
+
+`GET /api/context/weather?lat=1.3521&lng=103.8198` returns the nearest NEA two-hour forecast area's text, the rule-based rain category, and its multiplier. `NEA_API_KEY` configures the optional `x-api-key` header; it may be left blank. Weather contexts are cached for five minutes.
+
+Nearby-place filtering uses the raw route minutes multiplied by the classified rain factor, and tightens its prefilter radius using the same factor. Defaults are `1.25` for light rain/showers and `1.4` for thunder forecasts. These values are assumptions configurable with `WEATHER_RAIN_MULTIPLIER_LIGHT` and `WEATHER_RAIN_MULTIPLIER_HEAVY`. Thunder keywords take precedence over rain/showers. Other forecast text is classified as `NONE`. If NEA is unavailable or its response cannot be matched to an area, the request continues with multiplier `1.0` and weather status `unavailable`. This feature uses forecast text only; it does not use rainfall readings.
+
+```sh
+curl 'http://localhost:8081/api/context/weather?lat=1.3521&lng=103.8198'
+```

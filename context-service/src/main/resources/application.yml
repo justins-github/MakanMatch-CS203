@@ -12,3 +12,9 @@ places:
 
 nea:
   base-url: https://api-open.data.gov.sg/v2/real-time/api
+  api-key: ${NEA_API_KEY:}
+
+weather:
+  rain-multiplier:
+    light: ${WEATHER_RAIN_MULTIPLIER_LIGHT:1.25}
+    heavy: ${WEATHER_RAIN_MULTIPLIER_HEAVY:1.4}

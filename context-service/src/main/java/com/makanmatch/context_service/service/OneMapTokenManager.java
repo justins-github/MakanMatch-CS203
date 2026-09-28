@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -25,7 +26,7 @@ public class OneMapTokenManager {
     private volatile String cachedToken;
     private volatile Instant expiresAt = Instant.MIN;
 
-    public OneMapTokenManager(RestClient restClient, OneMapProperties props) {
+    public OneMapTokenManager(@Qualifier("oneMapRestClient") RestClient restClient, OneMapProperties props) {
         this.restClient = restClient;
         this.props = props;
     }
