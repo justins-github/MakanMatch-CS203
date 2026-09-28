@@ -33,5 +33,9 @@
 
   { "id": "mohinga", "venueId": "yangon-flavours", "name": "Mohinga fish noodle soup", "price": 5.0, "priceTier": 0, "spice": 0.4, "richness": 0.4, "novelty": 0.8, "tags": ["soup", "adventurous"] },
   { "id": "tea-leaf-salad", "venueId": "yangon-flavours", "name": "Tea leaf salad (lahpet)", "price": 6.0, "priceTier": 1, "spice": 0.3, "richness": 0.25, "novelty": 0.85, "tags": ["light", "adventurous"] },
-  { "id": "shan-noodles", "venueId": "yangon-flavours", "name": "Shan noodles", "price": 5.5, "priceTier": 0, "spice": 0.4, "richness": 0.5, "novelty": 0.8, "tags": ["noodles", "adventurous"] }
+  { "id": "shan-noodles", "venueId": "yangon-flavours", "name": "Shan noodles", "price": 5.5, "priceTier": 0, "spice": 0.4, "richness": 0.5, "novelty": 0.8, "tags": ["noodles", "adventurous"] },
+
+  { "id": "dtk-nyonya-laksa", "venueId": "demo-test-kitchen", "name": "Nyonya laksa", "price": 6.5, "priceTier": 1, "spice": 0.6, "richness": 0.75, "novelty": 0.4, "tags": ["soup", "spicy"] },
+  { "id": "dtk-ayam-buah-keluak", "venueId": "demo-test-kitchen", "name": "Ayam buah keluak", "price": 12.8, "priceTier": 2, "spice": 0.5, "richness": 0.85, "novelty": 0.8, "tags": ["hearty", "adventurous"] },
+  { "id": "dtk-kueh-salat", "venueId": "demo-test-kitchen", "name": "Kueh salat", "price": 3.2, "priceTier": 0, "spice": 0.0, "richness": 0.5, "novelty": 0.5, "tags": ["sweet", "dessert"] }
 ]

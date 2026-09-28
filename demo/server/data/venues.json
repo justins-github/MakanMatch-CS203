@@ -188,5 +188,24 @@
     "signature": "Mohinga fish noodle soup",
     "latitude": 1.3280,
     "longitude": 103.9310
+  },
+  {
+    "id": "demo-test-kitchen",
+    "name": "Demo Test Kitchen",
+    "cuisine": "peranakan",
+    "tags": ["soup", "spicy", "family-run"],
+    "area": "Bras Basah",
+    "address": "Waterloo St shophouse, Bras Basah",
+    "priceTier": 1,
+    "spice": 0.5,
+    "richness": 0.75,
+    "sheltered": true,
+    "distanceMin": 5,
+    "novelty": 0.6,
+    "reviewCount": 3,
+    "dataAgeDays": 2,
+    "signature": "Nyonya laksa",
+    "latitude": 1.2990,
+    "longitude": 103.8525
   }
 ]
