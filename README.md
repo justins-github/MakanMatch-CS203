@@ -68,6 +68,8 @@ npm run dev
 
 This starts account-service, catalog-service, the engine and the web app together.
 The first start downloads Maven and the Spring dependencies (a few minutes).
+The Spring services log quietly here (warnings, errors and a "Tomcat started" line);
+`npm run dev:verbose` gives Maven's and Spring's full startup output.
 Open http://localhost:5203. Swagger UI: http://localhost:8082/swagger-ui.html
 (accounts) and http://localhost:8083/swagger-ui.html (catalog).
 

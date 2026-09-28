@@ -2,7 +2,8 @@
   "name": "fnbsocial",
   "private": true,
   "scripts": {
-    "dev": "npm --prefix demo run dev",
+    "dev": "npm --prefix demo run -s dev",
+    "dev:verbose": "npm --prefix demo run -s dev:verbose",
     "test": "npm --prefix demo test",
     "load:venues": "node scripts/load-venues.mjs",
     "seed:menus": "node scripts/seed-menus.mjs",
