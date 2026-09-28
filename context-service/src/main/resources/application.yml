@@ -18,3 +18,13 @@ weather:
   rain-multiplier:
     light: ${WEATHER_RAIN_MULTIPLIER_LIGHT:1.25}
     heavy: ${WEATHER_RAIN_MULTIPLIER_HEAVY:1.4}
+
+ranking:
+  walk-weight:
+    none: ${RANKING_WALK_WEIGHT_NONE:0.2}
+    light: ${RANKING_WALK_WEIGHT_LIGHT:0.5}
+    heavy: ${RANKING_WALK_WEIGHT_HEAVY:0.7}
+  shelter-bonus: ${RANKING_SHELTER_BONUS:0.20}
+  comfort-bonus: ${RANKING_COMFORT_BONUS:0.10}
+  sheltered-place-ids: ${RANKING_SHELTERED_PLACE_IDS:sg-001,sg-002,sg-003,sg-004,sg-007,sg-013,sg-022,sg-023,sg-025,sg-030}
+  comfort-place-ids: ${RANKING_COMFORT_PLACE_IDS:sg-001,sg-002,sg-003,sg-004,sg-007,sg-013,sg-022,sg-023,sg-025,sg-030}

@@ -25,3 +25,5 @@ Nearby-place filtering uses the raw route minutes multiplied by the classified r
 ```sh
 curl 'http://localhost:8081/api/context/weather?lat=1.3521&lng=103.8198'
 ```
+
+Nearby results are then ranked by a configurable weather-based score. The score combines walk time with rain-only shelter and comfort bonuses; it is rule-based and independent from taste-profile data. `ranking.*` contains the category weights, bonuses, and sheltered/comfortable place-ID lists. Results include `weatherScore` and human-readable `reasons`. When weather is unavailable, ranking uses the NONE weight, applies no bonuses, and adds `Weather data unavailable`.
