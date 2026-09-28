@@ -8,17 +8,32 @@ const MOOD_NOTES = {
 
 const CLOSED_LABEL = { CLOSED: 'closed for good', TEMPORARILY_CLOSED: 'closed for now' }
 
-// Owners' reports change the feed; say so, so a missing favourite isn't a mystery.
+// "A (x), B (y) and 3 more"
+function nameSome(venues, detail) {
+  const named = venues.slice(0, 2).map((v) => `${v.name} (${detail(v)})`).join(', ')
+  return venues.length > 2 ? `${named} and ${venues.length - 2} more` : named
+}
+
+// Owners' reports and hours change the feed; say so, so a missing favourite isn't a mystery.
 function OwnerReportsNote({ reports }) {
   if (!reports) return null
   if (!reports.available) {
     return <div className="rerank-note">Owner updates are unavailable right now, so a recent closure might not show.</div>
   }
   const closed = reports.closedNearby ?? []
-  if (closed.length === 0) return null
-  const named = closed.slice(0, 2).map((v) => `${v.name} (${CLOSED_LABEL[v.status] ?? 'closed'})`).join(', ')
-  const more = closed.length > 2 ? ` and ${closed.length - 2} more` : ''
-  return <div className="rerank-note">Left out because their owners reported them closed: {named}{more}.</div>
+  const shut = reports.shutNow ?? []
+  return (
+    <>
+      {closed.length > 0 && (
+        <div className="rerank-note">
+          Left out because their owners reported them closed: {nameSome(closed, (v) => CLOSED_LABEL[v.status] ?? 'closed')}.
+        </div>
+      )}
+      {shut.length > 0 && (
+        <div className="rerank-note">Left out because they're shut right now: {nameSome(shut, (v) => v.next)}.</div>
+      )}
+    </>
+  )
 }
 
 export default function Feed({ mode, data, onFind, onSurprise, onAnother, onBack }) {

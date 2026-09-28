@@ -17,7 +17,6 @@ export default function VenueStatusForm({ venueId }) {
   const [history, setHistory] = useState(null)
   const [status, setStatus] = useState(null)
   const [newAddress, setNewAddress] = useState('')
-  const [openingHours, setOpeningHours] = useState('')
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
@@ -40,12 +39,10 @@ export default function VenueStatusForm({ venueId }) {
       await reportVenueStatus(venueId, {
         status,
         newAddress: status === 'MOVED' ? newAddress.trim() : null,
-        openingHours: openingHours.trim() || null,
         note: note.trim() || null,
       })
       setStatus(null)
       setNewAddress('')
-      setOpeningHours('')
       setNote('')
       setPosted(true)
       await load()
@@ -98,12 +95,6 @@ export default function VenueStatusForm({ venueId }) {
           <label className="field">
             <span>New address</span>
             <input value={newAddress} onChange={(e) => setNewAddress(e.target.value)} maxLength={200} placeholder="35 Selegie Rd, #01-C2 Parklane Shopping Mall" required />
-          </label>
-        )}
-        {status && status !== 'CLOSED' && (
-          <label className="field">
-            <span>Opening hours (optional)</span>
-            <input value={openingHours} onChange={(e) => setOpeningHours(e.target.value)} maxLength={200} placeholder="Mon-Sat 11am-9pm" />
           </label>
         )}
         {status && (

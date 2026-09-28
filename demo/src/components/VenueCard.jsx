@@ -15,7 +15,7 @@ function OwnerUpdate({ update }) {
   if (!update) return null
   const detail = update.status === 'MOVED'
     ? `Moved to ${update.currentAddress}`
-    : [update.openingHours, update.note].filter(Boolean).join(' · ') || 'Open as usual'
+    : update.note || 'Open as usual'
   return (
     <div className={`owner-update ${update.status.toLowerCase()}`}>
       <span className="owner-update-label">Owner update · {shortDate(update.reportedAt)}</span>
@@ -43,6 +43,7 @@ export default function VenueCard({ venue, index }) {
       <div className="meta">
         {fullAddress}
       </div>
+      {venue.hours && <div className="hours-line">{venue.hours.label}</div>}
       <OwnerUpdate update={venue.ownerUpdate} />
       <div className="chips">
         {venue.why.map((reason, i) => (

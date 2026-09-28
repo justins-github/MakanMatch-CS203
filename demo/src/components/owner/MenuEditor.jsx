@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { addDish, getMenu, reportPrice, updateDish } from '../../api/catalogApi.js'
+import MenuPhotoScan from './MenuPhotoScan.jsx'
+import PriceListEditor from './PriceListEditor.jsx'
 
 const money = (v) => (v == null ? null : `$${Number(v).toFixed(2)}`)
 const SOURCE = { OWNER: 'official', DINER: 'added by a diner', SEED: 'from our starter data' }
@@ -78,11 +80,40 @@ export default function MenuEditor({ venueId }) {
   const [price, setPrice] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+  const [editing, setEditing] = useState(false)
+  const [scan, setScan] = useState(null) // { sample, dishes, photoUrl } while checking a menu photo
+  const [savedNote, setSavedNote] = useState(null)
 
   const load = () =>
     getMenu(venueId)
       .then(setDishes)
       .catch((err) => setError(err.message))
+
+  // The photo preview is an object URL; let it go once the scan is done with.
+  useEffect(() => () => scan?.photoUrl && URL.revokeObjectURL(scan.photoUrl), [scan])
+
+  const startEditing = (fromScan = null) => {
+    setSavedNote(null)
+    setScan(fromScan)
+    setEditing(true)
+  }
+
+  // The scan matched dishes against the live menu; show that same menu.
+  const photoRead = async (result) => {
+    await load()
+    startEditing(result)
+  }
+
+  const stopEditing = () => {
+    setEditing(false)
+    setScan(null)
+  }
+
+  const listSaved = (menu, count) => {
+    setDishes(menu)
+    stopEditing()
+    setSavedNote(`Saved ${count} change${count === 1 ? '' : 's'}. Diners see the new menu right away.`)
+  }
 
   useEffect(() => {
     load()
@@ -106,9 +137,30 @@ export default function MenuEditor({ venueId }) {
 
   const conflicts = dishes?.filter((d) => d.priceConflict).length ?? 0
 
+  if (editing) {
+    return (
+      <section className="panel">
+        <div className="panel-title">{scan ? 'Check your menu photo' : 'Edit price list'}</div>
+        {!scan && <p className="panel-note">Type new prices, add dishes, tick dishes to remove, then save them all at once.</p>}
+        <PriceListEditor venueId={venueId} dishes={dishes} scan={scan} onSaved={listSaved} onCancel={stopEditing} />
+      </section>
+    )
+  }
+
   return (
     <section className="panel">
       <div className="panel-title">Menu and prices</div>
+      {dishes && (
+        <>
+          <div className="row-actions">
+            <button type="button" className="btn" onClick={() => startEditing()}>
+              Edit price list
+            </button>
+          </div>
+          <MenuPhotoScan venueId={venueId} onRead={photoRead} />
+        </>
+      )}
+      {savedNote && <div className="ok-note">{savedNote}</div>}
       {conflicts > 0 && (
         <p className="panel-note">
           {conflicts === 1 ? '1 dish has' : `${conflicts} dishes have`} a price diners disagree with.

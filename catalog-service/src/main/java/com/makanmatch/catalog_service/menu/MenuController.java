@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.makanmatch.catalog_service.menu.dto.DishRequest;
 import com.makanmatch.catalog_service.menu.dto.DishResponse;
 import com.makanmatch.catalog_service.menu.dto.DishUpdateRequest;
+import com.makanmatch.catalog_service.menu.dto.MenuChangesRequest;
 import com.makanmatch.catalog_service.menu.dto.PricePointResponse;
 import com.makanmatch.catalog_service.menu.dto.PriceReportRequest;
 import com.makanmatch.catalog_service.security.Caller;
@@ -55,6 +56,15 @@ public class MenuController {
 	public DishResponse addDish(@AuthenticationPrincipal Jwt jwt, @RequestHeader(name = ACT_AS, required = false) String actAs,
 			@PathVariable String venueId, @Valid @RequestBody DishRequest body) {
 		return menus.create(venueId, body, Caller.of(jwt, actAs));
+	}
+
+	@PatchMapping("/venues/{venueId}/dishes")
+	@SecurityRequirement(name = "bearer")
+	@Operation(summary = "Edit the price list in one go (owners only): new prices, new dishes and removals, "
+			+ "all or nothing; returns the updated menu")
+	public List<DishResponse> editMenu(@AuthenticationPrincipal Jwt jwt, @RequestHeader(name = ACT_AS, required = false) String actAs,
+			@PathVariable String venueId, @Valid @RequestBody MenuChangesRequest body) {
+		return menus.applyChanges(venueId, body, Caller.of(jwt, actAs));
 	}
 
 	@GetMapping("/dishes")

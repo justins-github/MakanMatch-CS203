@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -69,6 +70,35 @@ class MenuControllerTest {
 				.contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Lamb shish\"}"))
 				.andExpect(status().isCreated())
 				.andExpect(jsonPath("$.source").value("DINER"));
+	}
+
+	@Test
+	void editingThePriceListNeedsToSignIn() throws Exception {
+		mvc.perform(patch("/api/catalog/venues/turks-kebab/dishes")
+				.contentType(MediaType.APPLICATION_JSON).content("{\"removed\":[\"d1\"]}"))
+				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void aPriceListEditComesBackAsTheNewMenu() throws Exception {
+		Caller expected = new Caller(USER, "token-value", null);
+		given(menus.applyChanges(eq("turks-kebab"), any(), eq(expected))).willReturn(List.of(new DishResponse("d1",
+				"turks-kebab", "Chicken doner wrap", ReportSource.OWNER, false, null, null, null, false, null)));
+
+		mvc.perform(patch("/api/catalog/venues/turks-kebab/dishes")
+				.with(jwt().jwt(token -> token.subject(USER.toString()).tokenValue("token-value")))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"prices\":[{\"dishId\":\"d1\",\"price\":9.5}],\"added\":[{\"name\":\"Teh tarik\"}]}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[0].source").value("OWNER"));
+	}
+
+	@Test
+	void pricesInAPriceListEditMustBePositive() throws Exception {
+		mvc.perform(patch("/api/catalog/venues/turks-kebab/dishes").with(jwt().jwt(token -> token.subject(USER.toString())))
+				.contentType(MediaType.APPLICATION_JSON).content("{\"prices\":[{\"dishId\":\"d1\",\"price\":0}]}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errors['prices[0].price']").value("must be at least $0.10"));
 	}
 
 	@Test

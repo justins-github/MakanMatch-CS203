@@ -98,13 +98,15 @@ test('reset clears only the caller', async () => {
 
 test('owner reports: closed venues drop out, and a move keeps showing after later reports', () => {
   const byVenue = new Map([
-    ['turks-kebab', { venueId: 'turks-kebab', status: 'OPEN', currentAddress: '35 Selegie Rd #01-C2', openingHours: 'Daily 10am-10pm', reportedAt: '2026-09-20T00:00:00Z' }],
+    ['turks-kebab', { venueId: 'turks-kebab', status: 'OPEN', currentAddress: '35 Selegie Rd #01-C2', note: 'New menu!', reportedAt: '2026-09-20T00:00:00Z' }],
     ['yangon-flavours', { venueId: 'yangon-flavours', status: 'TEMPORARILY_CLOSED', note: 'Renovating', reportedAt: '2026-09-21T00:00:00Z' }],
   ])
   const { open, closed } = applyOwnerReports([{ ...TURKS, address: 'Peace Centre' }, YANGON], byVenue)
   assert.deepEqual(open.map((v) => v.id), ['turks-kebab'])
   assert.equal(open[0].address, '35 Selegie Rd #01-C2')
   assert.equal(open[0].ownerUpdate.status, 'OPEN')
-  assert.equal(open[0].ownerUpdate.openingHours, 'Daily 10am-10pm')
+  assert.equal(open[0].ownerUpdate.note, 'New menu!')
+  // Hours now come from the owner's weekly hours (hours.js), not from status posts.
+  assert.equal('openingHours' in open[0].ownerUpdate, false)
   assert.deepEqual(closed.map((v) => [v.id, v.status]), [['yangon-flavours', 'TEMPORARILY_CLOSED']])
 })

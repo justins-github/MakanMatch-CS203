@@ -23,6 +23,11 @@ spring:
     schemas: catalog
     default-schema: catalog
     create-schemas: true
+  # Menu photos (POST /venues/{id}/menu-scans); the owner's page shrinks big ones first.
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
 
 server:
   port: ${CATALOG_SERVICE_PORT:8083}

@@ -3,9 +3,14 @@ package com.makanmatch.catalog_service.menu;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -17,6 +22,8 @@ import com.makanmatch.catalog_service.common.NotFoundException;
 import com.makanmatch.catalog_service.menu.dto.DishRequest;
 import com.makanmatch.catalog_service.menu.dto.DishResponse;
 import com.makanmatch.catalog_service.menu.dto.DishUpdateRequest;
+import com.makanmatch.catalog_service.menu.dto.MenuChangesRequest;
+import com.makanmatch.catalog_service.menu.dto.MenuChangesRequest.PriceChange;
 import com.makanmatch.catalog_service.menu.dto.PricePointResponse;
 import com.makanmatch.catalog_service.menu.dto.PriceReportRequest;
 import com.makanmatch.catalog_service.security.Caller;
@@ -113,6 +120,60 @@ public class MenuService {
 	}
 
 	/**
+	 * The owner's price list edit, applied all or nothing: every change is checked
+	 * before anything is written, and the transaction rolls back on any failure.
+	 * New prices and new dishes are official; removed dishes are archived.
+	 */
+	public List<DishResponse> applyChanges(String venueId, MenuChangesRequest changes, Caller caller) {
+		venues.requireExists(venueId);
+		access.requireManager(caller, venueId);
+		if (changes.size() == 0) throw new BadRequestException("Nothing to change");
+		if (changes.size() > MAX_BATCH) throw new BadRequestException("At most " + MAX_BATCH + " changes at once");
+
+		Map<String, Dish> live = dishes.findByVenueIdAndArchivedFalseOrderByNameAsc(venueId).stream()
+				.collect(Collectors.toMap(Dish::getId, Function.identity()));
+		Set<String> removed = new HashSet<>();
+		for (String dishId : changes.removed()) {
+			if (!live.containsKey(dishId)) throw new BadRequestException("A dish to remove isn't on this menu");
+			removed.add(dishId);
+		}
+		Set<String> repriced = new HashSet<>();
+		for (PriceChange change : changes.prices()) {
+			Dish dish = live.get(change.dishId());
+			if (dish == null) throw new BadRequestException("A dish to reprice isn't on this menu");
+			if (removed.contains(dish.getId())) {
+				throw new BadRequestException("\"" + dish.getName() + "\" can't be repriced and removed at once");
+			}
+			if (!repriced.add(dish.getId())) throw new BadRequestException("\"" + dish.getName() + "\" has two new prices");
+		}
+		// Names of dishes being removed stay taken: the unique index is checked before the archive lands.
+		Set<String> taken = live.values().stream().map(d -> d.getName().toLowerCase(Locale.ROOT))
+				.collect(Collectors.toCollection(HashSet::new));
+		List<String> newNames = new ArrayList<>();
+		for (DishRequest dish : changes.added()) {
+			String name = tidy(dish.name());
+			if (!taken.add(name.toLowerCase(Locale.ROOT))) throw new ConflictException("\"" + name + "\" is already on this menu");
+			newNames.add(name);
+		}
+
+		for (String dishId : removed) {
+			Dish dish = live.get(dishId);
+			dish.setArchived(true);
+			dish.makeOfficial();
+		}
+		for (PriceChange change : changes.prices()) {
+			live.get(change.dishId()).makeOfficial();
+			prices.save(new DishPrice(change.dishId(), change.price(), ReportSource.OWNER, caller.userId()));
+		}
+		for (int i = 0; i < newNames.size(); i++) {
+			Dish dish = dishes.save(new Dish(venueId, newNames.get(i), ReportSource.OWNER, caller.userId()));
+			BigDecimal price = changes.added().get(i).price();
+			if (price != null) prices.save(new DishPrice(dish.getId(), price, ReportSource.OWNER, caller.userId()));
+		}
+		return menu(venueId);
+	}
+
+	/**
 	 * Official vs community price for one dish. A conflict means diners reported a
 	 * price after the owner last set one, and it differs by more than 15%.
 	 */
@@ -152,8 +213,12 @@ public class MenuService {
 	}
 
 	/** Trims and collapses inner whitespace so "Chicken  rice " and "Chicken rice" match. */
+	static String normalizeName(String name) {
+		return name == null ? "" : name.trim().replaceAll("\\s+", " ");
+	}
+
 	private static String tidy(String name) {
-		String cleaned = name.trim().replaceAll("\\s+", " ");
+		String cleaned = normalizeName(name);
 		if (cleaned.isEmpty()) throw new BadRequestException("Dish name can't be blank");
 		return cleaned;
 	}

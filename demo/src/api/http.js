@@ -30,16 +30,18 @@ export class ApiError extends Error {
   }
 }
 
+// body: a plain object (sent as JSON) or FormData (a file upload; the browser sets the type).
 export async function request(path, { method = 'GET', body, signal, headers = {}, auth = true, retried = false } = {}) {
+  const isForm = body instanceof FormData
   const sent = { ...headers }
-  if (body !== undefined) sent['content-type'] = 'application/json'
+  if (body !== undefined && !isForm) sent['content-type'] = 'application/json'
   if (auth && accessToken) sent.authorization = `Bearer ${accessToken}`
   if (auth && actAs) sent['x-act-as'] = actAs
 
   const res = await fetch(path, {
     method,
     headers: sent,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined || isForm ? body : JSON.stringify(body),
     signal,
     credentials: 'same-origin',
   })

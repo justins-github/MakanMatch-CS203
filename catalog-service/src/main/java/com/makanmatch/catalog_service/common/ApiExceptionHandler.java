@@ -13,6 +13,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 /**
@@ -63,6 +64,14 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 		ProblemDetail body = problem(HttpStatus.BAD_REQUEST, "Some fields are invalid");
 		body.setProperty("errors", errors);
 		return handleExceptionInternal(ex, body, headers, status, request);
+	}
+
+	/** Uploads are menu photos (spring.servlet.multipart.max-file-size); say so in plain words. */
+	@Override
+	protected ResponseEntity<Object> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex,
+			HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+		return handleExceptionInternal(ex, problem(HttpStatus.PAYLOAD_TOO_LARGE, "Photos can be at most 5 MB"),
+				headers, HttpStatus.PAYLOAD_TOO_LARGE, request);
 	}
 
 	private static ProblemDetail problem(HttpStatus status, String detail) {

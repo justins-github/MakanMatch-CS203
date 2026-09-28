@@ -1,5 +1,6 @@
 // "For you" recommendations and personalised venue search for one user.
 import { MAX_WALK_MIN } from '../geo.js'
+import { applyOpeningHours } from '../hours.js'
 import { pickSurprise, rankVenues } from '../match.js'
 import { searchVenues } from '../search.js'
 import { learnedVector, tasteContext } from './tasteVectors.js'
@@ -7,7 +8,7 @@ import { learnedVector, tasteContext } from './tasteVectors.js'
 const round1 = (v) => Math.round(v * 10) / 10
 const CLOSED = new Set(['CLOSED', 'TEMPORARILY_CLOSED'])
 
-export function createRecommendationService({ registry, vectors, learners, catalog }) {
+export function createRecommendationService({ registry, vectors, learners, catalog, now = () => new Date() }) {
   const walkable = registry.venues.filter((v) => v.distanceMin <= MAX_WALK_MIN)
 
   // Owner reports are a live signal; if the catalog is down we still recommend, and say so.
@@ -19,19 +20,29 @@ export function createRecommendationService({ registry, vectors, learners, catal
     }
   }
 
+  // Same for opening hours: without them, nothing is left out for being shut.
+  async function openingHours() {
+    try {
+      return await catalog.venueHours()
+    } catch {
+      return new Map()
+    }
+  }
+
   return {
     // mode: 'find' (top 10) | 'surprise' (one experimental pick, skipping `exclude`)
     async recommend(user, { mode, mood, context, exclude = [] }) {
       const state = await learners.read(user.id, user.me.displayName)
-      const reports = await ownerReports()
-      const { open, closed } = applyOwnerReports(walkable, reports.byVenue)
+      const [reports, hours] = await Promise.all([ownerReports(), openingHours()])
+      const { open: notClosed, closed } = applyOwnerReports(walkable, reports.byVenue)
+      const { open, shutNow } = applyOpeningHours(notClosed, hours, now())
       const vector = await learnedVector(vectors, state.reviews, registry.venueById)
       const taste = await tasteContext(vectors, vector, open)
       const ctx = { raining: context.raining, mood, taste }
       const venues = mode === 'surprise'
         ? [pickSurprise(open, state.profile, ctx, exclude)].filter(Boolean)
         : rankVenues(open, state.profile, ctx).slice(0, 10)
-      return { context, mood, mode, venues, ownerReports: { available: reports.available, closedNearby: closed } }
+      return { context, mood, mode, venues, ownerReports: { available: reports.available, closedNearby: closed, shutNow } }
     },
 
     async search(user, query, limit) {
@@ -75,7 +86,6 @@ export function applyOwnerReports(venues, byVenue) {
         ownerUpdate: {
           status: report.status,
           currentAddress: report.currentAddress ?? null,
-          openingHours: report.openingHours ?? null,
           note: report.note ?? null,
           reportedAt: report.reportedAt,
         },
