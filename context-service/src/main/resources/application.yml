@@ -5,6 +5,10 @@ onemap:
   base-url: https://www.onemap.gov.sg
   email: ${ONEMAP_EMAIL:}
   password: ${ONEMAP_PASSWORD:}
+  walk-speed-m-per-min: ${ONEMAP_WALK_SPEED_M_PER_MIN:80}
+
+places:
+  max-routed: ${PLACES_MAX_ROUTED:15}
 
 nea:
   base-url: https://api-open.data.gov.sg/v2/real-time/api
