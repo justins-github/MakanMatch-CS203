@@ -1,0 +1,4 @@
+onemap:
+  base-url: https://www.onemap.gov.sg
+  email: ${ONEMAP_EMAIL:dinneth.er.2025@computing.smu.edu.sg}
+  password: ${ONEMAP_PASSWORD:Dinneth@0718289351}
