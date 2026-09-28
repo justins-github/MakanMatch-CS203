@@ -5,7 +5,9 @@ import com.makanmatch.context_service.config.OneMapProperties;
 import com.makanmatch.context_service.config.PlacesProperties;
 import com.makanmatch.context_service.DTO.NearbyPlaceDto;
 import com.makanmatch.context_service.DTO.NearbyResponse;
+import com.makanmatch.context_service.DTO.NearbyWeatherDto;
 import com.makanmatch.context_service.DTO.PlaceDto;
+import com.makanmatch.context_service.DTO.WeatherContext;
 import com.makanmatch.context_service.exception.OneMapException;
 import com.makanmatch.context_service.provider.PlaceProvider;
 import org.springframework.stereotype.Service;
@@ -20,13 +22,16 @@ public class PlaceQueryService {
     private final OneMapClient oneMapClient;
     private final OneMapProperties oneMapProperties;
     private final PlacesProperties placesProperties;
+    private final WeatherService weatherService;
 
     public PlaceQueryService(PlaceProvider placeProvider, OneMapClient oneMapClient,
-                             OneMapProperties oneMapProperties, PlacesProperties placesProperties) {
+                             OneMapProperties oneMapProperties, PlacesProperties placesProperties,
+                             WeatherService weatherService) {
         this.placeProvider = placeProvider;
         this.oneMapClient = oneMapClient;
         this.oneMapProperties = oneMapProperties;
         this.placesProperties = placesProperties;
+        this.weatherService = weatherService;
     }
 
     /**
@@ -34,7 +39,9 @@ public class PlaceQueryService {
      * checked against their real walking time and therefore cannot appear in this response.
      */
     public NearbyResponse findNearby(double lat, double lng, int maxWalkMin) {
-        double radiusMetres = maxWalkMin * oneMapProperties.walkSpeedMPerMin();
+        WeatherContext weather = weatherService.getContext(lat, lng);
+        double effectiveRawLimitMinutes = maxWalkMin / weather.multiplier();
+        double radiusMetres = effectiveRawLimitMinutes * oneMapProperties.walkSpeedMPerMin();
         List<PlaceDto> candidates = placeProvider.getPlaces().stream()
                 .map(place -> new Candidate(place, HaversineCalculator.distanceMetres(
                         lat, lng, place.lat(), place.lng())))
@@ -49,16 +56,20 @@ public class PlaceQueryService {
         for (PlaceDto place : candidates) {
             try {
                 WalkRouteDto route = oneMapClient.getWalkRoute(lat, lng, place.lat(), place.lng());
-                if (route.totalTimeSeconds() <= maxWalkMin * 60L) {
+                double rawWalkMinutes = route.totalTimeSeconds() / 60.0;
+                double adjustedWalkMinutes = rawWalkMinutes * weather.multiplier();
+                if (adjustedWalkMinutes <= maxWalkMin) {
                     nearby.add(new NearbyPlaceDto(place.id(), place.name(), place.lat(), place.lng(),
-                            route.totalTimeSeconds() / 60.0));
+                            rawWalkMinutes, adjustedWalkMinutes));
                 }
             } catch (OneMapException e) {
                 partial = true;
             }
         }
-        nearby.sort(Comparator.comparingDouble(place -> place.walkMinutes()));
-        return new NearbyResponse(partial ? "partial" : "complete", nearby);
+        nearby.sort(Comparator.comparingDouble(place -> place.adjustedWalkMinutes()));
+        NearbyWeatherDto weatherSummary = new NearbyWeatherDto(weather.status(), weather.forecastText(),
+                weather.multiplier(), weatherService.assumptionText());
+        return new NearbyResponse(partial ? "partial" : "complete", nearby, weatherSummary);
     }
 
     private record Candidate(PlaceDto place, double distanceMetres) {}

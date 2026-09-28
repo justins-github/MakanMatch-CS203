@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -19,7 +20,7 @@ public class OneMapClient {
     private final RestClient restClient;
     private final OneMapTokenManager tokenManager;
 
-    public OneMapClient(RestClient restClient, OneMapTokenManager tokenManager) {
+    public OneMapClient(@Qualifier("oneMapRestClient") RestClient restClient, OneMapTokenManager tokenManager) {
         this.restClient = restClient;
         this.tokenManager = tokenManager;
     }
