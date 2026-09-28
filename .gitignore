@@ -15,3 +15,6 @@ docs/superpowers/
 
 # Generated venue embeddings (regenerate with `node scripts/embed-venues.mjs`)
 demo/server/data/venue_vectors.*
+
+# Embedded Postgres used by ENGINE_DB=pglite
+demo/server/.data/

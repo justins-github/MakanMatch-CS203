@@ -77,6 +77,12 @@ body {
   display: flex;
   gap: 8px;
   border-bottom: var(--line);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .tab {
@@ -91,6 +97,7 @@ body {
   color: var(--ink-soft);
   cursor: pointer;
   border-radius: 6px 6px 0 0;
+  flex: none;
 }
 
 .tab[aria-selected='true'] {
@@ -904,6 +911,149 @@ body {
   color: var(--chili);
 }
 
+/* ---------- shared building blocks for account, owner and admin screens ---------- */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 14px;
+}
+
+.panel-title {
+  font-family: var(--font-data);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.panel-note {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field > span {
+  font-family: var(--font-data);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  border: var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 9px 11px;
+  resize: vertical;
+}
+
+.field small {
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  color: var(--ink-soft);
+}
+
+.field input:focus-visible,
+.field textarea:focus-visible,
+.btn:focus-visible,
+.chip:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: 2px;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.btn {
+  appearance: none;
+  border: var(--line);
+  border-radius: 8px;
+  background: var(--kunyit);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 7px 13px;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.btn.go {
+  background: var(--pandan);
+  color: var(--paper);
+}
+
+.btn.stop {
+  background: var(--chili);
+  color: var(--paper);
+}
+
+.btn.quiet {
+  background: var(--paper);
+  box-shadow: none;
+}
+
+.btn:active:not(:disabled) {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  box-shadow: none;
+}
+
+.ok-note {
+  font-family: var(--font-data);
+  font-size: 12px;
+  color: var(--pandan);
+}
+
+.panel .error,
+.panel .loading,
+.account .error,
+.owner .error,
+.admin .error,
+.admin .loading {
+  padding: 4px 0;
+}
+
+.plain-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+}
+
+/* status pills shared by claims, owners and accounts */
+.pill.pending { background: var(--kunyit); }
+.pill.approved { background: var(--pandan); border-color: var(--pandan); color: var(--paper); }
+.pill.rejected { background: var(--chili); border-color: var(--chili); color: var(--paper); }
+.pill.withdrawn,
+.pill.quiet { background: var(--paper-dim); color: var(--ink-soft); border-color: var(--ink-soft); }
+.pill.role { background: var(--ink); color: var(--paper); }
+
 @keyframes rise {
   from {
     opacity: 0;
@@ -926,4 +1076,27 @@ body {
     border-left: none;
     border-right: none;
   }
+}
+
+/* ---------- owner updates on venue cards ---------- */
+
+.owner-update {
+  margin-top: 8px;
+  padding: 6px 9px;
+  border-left: 4px solid var(--monsoon);
+  background: var(--paper-dim);
+  font-size: 13px;
+}
+
+.owner-update.moved {
+  border-left-color: var(--kunyit);
+}
+
+.owner-update-label {
+  display: block;
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
 }

@@ -3,18 +3,25 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n api,web -c yellow,cyan \"npm:dev:server\" \"npm:dev:client\"",
-    "dev:server": "nodemon server/index.js",
+    "dev": "concurrently -n account,catalog,engine,web -c magenta,blue,yellow,cyan \"npm:dev:account\" \"npm:dev:catalog\" \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:account": "node ../scripts/run-service.mjs account-service",
+    "dev:catalog": "node ../scripts/run-service.mjs catalog-service",
+    "dev:server": "nodemon --watch server --ignore server/.data --ignore \"*.test.js\" server/index.js",
     "dev:client": "vite",
-    "test": "node --test \"server/*.test.js\""
+    "test": "node --test \"server/**/*.test.js\"",
+    "migrate": "node server/db/migrate.js"
   },
   "dependencies": {
     "express": "^4.19.0",
+    "jose": "^6.2.12",
     "leaflet": "^1.9.4",
+    "pg": "^8.23.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite-pgvector": "^0.0.9",
     "@vitejs/plugin-react": "^4.3.0",
     "concurrently": "^9.0.0",
     "nodemon": "^3.1.0",

@@ -51,3 +51,14 @@ export async function getContext() {
   cache = { value, at: Date.now() }
   return value
 }
+
+// The demo's "simulate rain" toggle: a clearly labelled override, never mistaken for live data.
+export function withRainOverride(context, simulateRain) {
+  if (!simulateRain) return context
+  return {
+    ...context,
+    raining: true,
+    summary: 'Simulated rain (demo toggle)',
+    simulated: true,
+  }
+}

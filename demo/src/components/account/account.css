@@ -1,0 +1,131 @@
+/* ---------- profile, claims, role switcher ---------- */
+
+.account {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px 32px;
+}
+
+.account-meta {
+  font-family: var(--font-data);
+  font-size: 12px;
+  color: var(--ink-soft);
+  word-break: break-all;
+}
+
+.account-roles {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.claim-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.claim-item {
+  border-top: 1.5px dashed var(--ink-soft);
+  padding-top: 8px;
+}
+
+.claim-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.claim-venue {
+  font-weight: 600;
+}
+
+.claim-reason {
+  font-size: 13px;
+  color: var(--chili);
+}
+
+.claim-form {
+  box-shadow: none;
+  background: var(--paper-dim);
+}
+
+.claim-picked {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  border: var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  padding: 10px 12px;
+}
+
+/* Admin "view as" control, sits in the header next to the title. */
+.role-switch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.role-switch-label {
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-right: 4px;
+}
+
+.role-chip {
+  appearance: none;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  font-family: var(--font-data);
+  font-size: 11px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.role-chip[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.role-chip:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: 2px;
+}
+
+.role-chip:disabled {
+  cursor: progress;
+}
+
+/* Caution tape: the admin is being served as a lower role. Same diagonal
+   kunyit stripe as the sign-in screen's border, so it reads as "ours". */
+.acting-tape {
+  background: repeating-linear-gradient(-45deg, var(--kunyit) 0 12px, var(--ink) 12px 24px);
+  border-top: var(--line);
+  border-bottom: var(--line);
+  padding: 5px 0;
+  text-align: center;
+}
+
+.acting-tape span {
+  display: inline-block;
+  background: var(--kunyit);
+  border: 1.5px solid var(--ink);
+  padding: 1px 8px;
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}

@@ -1,4 +1,8 @@
-# MakanMatch - pitch demo
+# MakanMatch - web app and recommendation engine
+
+> Setup, the Supabase project, the two Spring services and the seed scripts are
+> documented in the [repo-root README](../README.md). This file covers what the
+> screens and the recommendation engine do.
 
 Clickable demo of the CS203 project idea: SG food discovery where **an AI learns your
 taste and gets its predictions right**. Three genuinely-working beats: (1) rating
@@ -9,25 +13,15 @@ with `node scripts/extract-overture.mjs` from the repo root after each monthly
 release), and (4) every venue has a **learned taste vector** (`server/data/venue_vectors.*`,
 gitignored - build once with `node scripts/embed-venues.mjs` from the repo root; ~2 min,
 one-time ~23 MB model download; the server ranks without the term if the files are
-missing). It is not the real architecture (no Spring Boot, no DB, no auth); see
-`../docs/sprint-plan.md` for the plan.
+missing). Accounts live in `../account-service`, venues and menus in `../catalog-service`; this
+folder is the React app and the Express recommendation engine.
 
 ## Run it
 
-Prereq: Node 18+. From the repo root (or from `demo/`):
-
-```
-npm install
-npm run dev
-```
-
-Open http://localhost:5203 (5203 for CS203; port 203 itself is privileged on macOS/Linux). `npm run dev` starts both halves via
-`concurrently`: the Express API on :3001 (auto-restarted by **nodemon**) and the Vite
-React app on :5203 (hot reload). `npm test` runs the match-engine tests (`node --test`).
-
-The app opens on a **mock sign-in screen** (`src/components/Login.jsx`). There is no
-auth backend yet, so any email + password signs you in; the session is kept in
-`sessionStorage` and **Log out** in the header returns you to the sign-in screen.
+Needs Node 20+, JDK 17+ and a filled-in `.env` at the repo root (see the root README).
+From the repo root: `npm install`, then `npm run dev` starts all four processes
+(account-service :8082, catalog-service :8083, engine :3001, web :5203) and opens on
+a real sign-in screen. `npm test` runs the engine tests (`node --test`).
 
 ## What each screen demonstrates
 
@@ -47,9 +41,9 @@ auth backend yet, so any email + password signs you in; the session is kept in
   top-8 results - the client never loads the full dataset). Results bold exactly the
   part of the name you typed, rank by text relevance blended with your match %, and
   same-named chain outlets are disambiguated by their location. Then the Beli-style
-  flow: pick a dish - or **add one that's not listed** (user dishes join the menu:
-  "the menu emerges from reviews"; on Overture venues the menu starts empty and the
-  community fills it) - then the AI states its predicted score, you pick a
+  flow: pick a dish from the venue's live menu (catalog-service) - or **add one that's not
+  listed** (it joins the menu as community data: "the menu emerges from reviews"; on
+  Overture venues the menu starts empty and the community fills it) - then the AI states its predicted score, you pick a
   sentiment (Loved / Fine / Not for me), settle up to three **head-to-head duels**
   against dishes you've already ranked (binary insertion into your personal 1-10
   leaderboard), and write a **text review**. Three learning channels, all real and
@@ -60,8 +54,9 @@ auth backend yet, so any email + password signs you in; the session is kept in
   scales the adjustment by how many past reviews carry the same signal, so writing
   "I love the spice" across many reviews compounds ("7 of your reviews mention
   loving the spice"). The delta panel explains every change; the **model accuracy**
-  meter (100 − mean prediction error) improves as the model calibrates. State is
-  in-memory - **Reset demo** (or a server restart) returns to baseline. Production
+  meter (100 − mean prediction error) improves as the model calibrates. Everything is
+  per account and saved in Postgres (the `taste` schema); **Reset my taste** forgets only
+  your own reviews and profile. Production
   upgrade path for the text channel: pgvector embeddings + an LLM.
 - **Taste DNA** - the *live* learned profile: six dimensions (radar) + per-cuisine
   affinities + a satiation note ("recently eaten" cuisines are temporarily penalised).

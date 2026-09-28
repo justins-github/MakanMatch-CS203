@@ -1,22 +1,28 @@
 import { useState } from 'react'
+import { useAuth } from '../auth/AuthContext.jsx'
 import './login.css'
 
-// Mock sign-in screen. There is no backend yet: any email + password
-// combination is accepted and hands the (display-only) user up to App.
-export default function Login({ onLogin }) {
-  const [email, setEmail] = useState('')
+// Sign in with an email, or with a username once you've set one in Profile.
+export default function Login({ onCreateAccount }) {
+  const { login } = useAuth()
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  const [showReset, setShowReset] = useState(false)
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
     if (busy) return
     setBusy(true)
-    // Small delay so the button visibly "does something" in the demo.
-    setTimeout(() => {
-      onLogin({ email: email.trim(), name: displayName(email) })
-    }, 450)
+    setError(null)
+    try {
+      await login(identifier.trim(), password)
+    } catch (err) {
+      setError(err.message)
+      setBusy(false)
+    }
   }
 
   return (
@@ -31,14 +37,16 @@ export default function Login({ onLogin }) {
 
       <form className="login-form" onSubmit={submit}>
         <label className="login-field">
-          <span>Email</span>
+          <span>Email or username</span>
           <input
-            type="email"
-            name="email"
+            type="text"
+            name="username"
             autoComplete="username"
+            autoCapitalize="none"
+            spellCheck="false"
             placeholder="you@smu.edu.sg"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
             required
             autoFocus
           />
@@ -67,28 +75,31 @@ export default function Login({ onLogin }) {
           </div>
         </label>
 
+        {error && (
+          <div className="login-error" role="alert">
+            {error}
+          </div>
+        )}
+
         <button type="submit" className="login-submit" disabled={busy}>
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
 
         <div className="login-links">
-          <button type="button" className="login-link">
+          <button type="button" className="login-link" onClick={() => setShowReset((v) => !v)}>
             Forgot password?
           </button>
-          <button type="button" className="login-link">
+          <button type="button" className="login-link" onClick={onCreateAccount}>
             Create account
           </button>
         </div>
       </form>
 
-      <p className="login-note">
-        Demo build: no accounts yet, so any email and password will sign you in.
-      </p>
+      {showReset && (
+        <p className="login-note">
+          Password resets aren't self-service yet. Ask a MakanMatch admin to send you a reset email.
+        </p>
+      )}
     </div>
   )
-}
-
-function displayName(email) {
-  const local = email.split('@')[0] || 'you'
-  return local.charAt(0).toUpperCase() + local.slice(1)
 }

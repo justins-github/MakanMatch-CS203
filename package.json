@@ -4,10 +4,16 @@
   "scripts": {
     "dev": "npm --prefix demo run dev",
     "test": "npm --prefix demo test",
+    "load:venues": "node scripts/load-venues.mjs",
+    "seed:menus": "node scripts/seed-menus.mjs",
+    "seed:personas": "node scripts/seed-accounts.mjs --personas",
+    "upload:vectors": "node scripts/upload-venue-vectors.mjs",
+    "simulate": "node scripts/seed-community.mjs",
     "postinstall": "cd demo && npm install"
   },
   "devDependencies": {
     "@duckdb/node-api": "^1.5.5-r.4",
-    "@huggingface/transformers": "^4.3.0"
+    "@huggingface/transformers": "^4.3.0",
+    "pg": "^8.23.0"
   }
 }

@@ -8,6 +8,23 @@ const CONFIDENCE_TEXT = {
   low: 'low confidence - sparse or ageing data',
 }
 
+const shortDate = (iso) => new Date(iso).toLocaleDateString('en-SG', { day: 'numeric', month: 'short' })
+
+// What the venue's owner last told us, kept visibly separate from the open data.
+function OwnerUpdate({ update }) {
+  if (!update) return null
+  const detail = update.status === 'MOVED'
+    ? `Moved to ${update.currentAddress}`
+    : [update.openingHours, update.note].filter(Boolean).join(' · ') || 'Open as usual'
+  return (
+    <div className={`owner-update ${update.status.toLowerCase()}`}>
+      <span className="owner-update-label">Owner update · {shortDate(update.reportedAt)}</span>
+      {detail}
+      {update.status === 'MOVED' && update.note && <> · {update.note}</>}
+    </div>
+  )
+}
+
 export default function VenueCard({ venue, index }) {
   const [showMap, setShowMap] = useState(false)
   const dots = CONFIDENCE_DOTS[venue.confidence]
@@ -26,6 +43,7 @@ export default function VenueCard({ venue, index }) {
       <div className="meta">
         {fullAddress}
       </div>
+      <OwnerUpdate update={venue.ownerUpdate} />
       <div className="chips">
         {venue.why.map((reason, i) => (
           <span key={reason} className={`why${i === 0 ? ' lead' : ''}`}>

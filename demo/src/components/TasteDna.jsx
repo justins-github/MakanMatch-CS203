@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getProfile } from '../api.js'
+import { getProfile } from '../api/engineApi.js'
 
 function RadarChart({ dimensions }) {
   const width = 360
@@ -27,7 +27,7 @@ function RadarChart({ dimensions }) {
       height={height}
       viewBox={`0 0 ${width} ${height}`}
       role="img"
-      aria-label="Radar chart of the demo user's six taste dimensions"
+      aria-label="Radar chart of your six taste dimensions"
     >
       {[0.33, 0.66, 1].map((f) => (
         <polygon
@@ -83,6 +83,11 @@ export default function TasteDna() {
   return (
     <main className="dna">
       <h2>Your Taste DNA</h2>
+      {profile.accuracy.count === 0 && (
+        <p className="recent-note">
+          You're starting neutral: the AI knows nothing about you yet. Rank a few dishes in Review and watch this move.
+        </p>
+      )}
       <div className="radar-wrap">
         <RadarChart dimensions={profile.dimensions} />
       </div>
@@ -98,10 +103,12 @@ export default function TasteDna() {
         </div>
       ))}
 
-      <div className="recent-note">
-        Recently eaten: <strong>{profile.user.recentlyEaten.join(', ').replace(/-/g, ' ')}</strong> - matching
-        venues get a temporary satiation penalty in your feed.
-      </div>
+      {profile.user.recentlyEaten.length > 0 && (
+        <div className="recent-note">
+          Recently eaten: <strong>{profile.user.recentlyEaten.join(', ').replace(/-/g, ' ')}</strong> - matching
+          venues get a temporary satiation penalty in your feed.
+        </div>
+      )}
     </main>
   )
 }

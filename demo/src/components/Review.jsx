@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { getDishes, getRankings, postBeliReview, postDish, searchVenues } from '../api.js'
+import { addDish as addCatalogDish } from '../api/catalogApi.js'
+import { getProfile, getRankings, getVenueDishes, postBeliReview, searchVenues } from '../api/engineApi.js'
 
 // Venue name with the server-computed match ranges bolded.
 function HighlightedName({ name, highlight }) {
@@ -30,7 +31,7 @@ function AccuracyMeter({ accuracy }) {
       <div className="meter">
         <div className="meter-label">Model accuracy</div>
         <div className="meter-empty">
-          No reviews yet - the AI is predicting from your onboarding profile. Review dishes to train it.
+          No reviews yet - the AI is predicting from a neutral starting profile. Review dishes to train it.
         </div>
       </div>
     )
@@ -95,8 +96,12 @@ function Leaderboard({ rankings }) {
   )
 }
 
+const money = (v) => (v == null ? 'no price yet' : '$' + Number(v).toFixed(2))
+
 export default function Review() {
-  const [dishes, setDishes] = useState(null)
+  const [loaded, setLoaded] = useState(false)
+  const [venueDishes, setVenueDishes] = useState(null) // dishes at the chosen venue
+  const [venueInfo, setVenueInfo] = useState(null) // { youManage, degraded }
   const [rankings, setRankings] = useState([])
   const [accuracy, setAccuracy] = useState({ running: null, count: 0 })
   const [error, setError] = useState(null)
@@ -121,11 +126,21 @@ export default function Review() {
   const [newDishPrice, setNewDishPrice] = useState('')
 
   const loadAll = () =>
-    Promise.all([getDishes(), getRankings()])
-      .then(([d, r]) => {
-        setDishes(d.dishes)
-        setAccuracy(d.accuracy)
+    Promise.all([getProfile(), getRankings()])
+      .then(([p, r]) => {
+        setAccuracy(p.accuracy)
         setRankings(r)
+        setLoaded(true)
+      })
+      .catch((err) => setError(err.message))
+
+  // A venue's menu comes from the catalog, with the AI's prediction per dish.
+  const loadVenue = (v) =>
+    getVenueDishes(v.id)
+      .then((d) => {
+        setVenueDishes(d.dishes)
+        setVenueInfo({ youManage: d.youManageThisVenue, degraded: d.degraded })
+        setAccuracy(d.accuracy)
       })
       .catch((err) => setError(err.message))
 
@@ -170,6 +185,8 @@ export default function Review() {
     setStep('search')
     setQuery('')
     setVenue(null)
+    setVenueDishes(null)
+    setVenueInfo(null)
     setDish(null)
     setSentiment(null)
     setDuel(null)
@@ -225,7 +242,7 @@ export default function Review() {
       setResult(r)
       setAccuracy(r.accuracy)
       setStep('done')
-      await loadAll()
+      await Promise.all([loadAll(), loadVenue(venue)])
     } catch (err) {
       setError(err.message)
     } finally {
@@ -237,9 +254,10 @@ export default function Review() {
     setBusy(true)
     setError(null)
     try {
-      const created = await postDish(venue.id, newDishName, Number(newDishPrice) || 5)
-      await loadAll()
-      setDish({ ...created, venueName: venue.name, predictedScore10: null })
+      const price = newDishPrice === '' ? null : Number(newDishPrice)
+      const created = await addCatalogDish(venue.id, newDishName.trim(), price)
+      await loadVenue(venue)
+      setDish({ id: created.id, name: created.name, venueId: venue.id, venueName: venue.name, predictedScore10: null })
       setAdding(false)
       setNewDishName('')
       setNewDishPrice('')
@@ -251,15 +269,14 @@ export default function Review() {
     }
   }
 
-  if (error && !dishes) return <div className="error">Review flow unavailable: {error}</div>
-  if (!dishes) return <div className="loading">Loading…</div>
+  if (error && !loaded) return <div className="error">Review flow unavailable: {error}</div>
+  if (!loaded) return <div className="loading">Loading…</div>
 
   const searchActive = queryIsSearchable(query.trim())
   // Same-named chain outlets get their location appended.
   const nameCounts = results.reduce((m, r) => m.set(r.name, (m.get(r.name) ?? 0) + 1), new Map())
-  const venueDishes = venue ? dishes.filter((d) => d.venueId === venue.id) : []
   const currentOpponent = duel ? duel.opponents[Math.floor((duel.lo + duel.hi) / 2)] : null
-  const selectedDishData = dish ? dishes.find((d) => d.id === dish.id) ?? dish : null
+  const selectedDishData = dish ? venueDishes?.find((d) => d.id === dish.id) ?? dish : null
 
   return (
     <main className="rate">
@@ -284,6 +301,10 @@ export default function Review() {
                   className="venue-row"
                   onClick={() => {
                     setVenue(r)
+                    setVenueDishes(null)
+                    setVenueInfo(null)
+                    setError(null)
+                    loadVenue(r)
                     setStep('dish')
                   }}
                 >
@@ -327,9 +348,19 @@ export default function Review() {
             ← Search
           </button>
           <h2 className="step-title">{venue.name}</h2>
+          {venueInfo?.youManage ? (
+            <div className="rate-intro">
+              You manage this venue, so you can't review it. Update its menu and prices in My venues instead.
+            </div>
+          ) : (
+          <>
+          {venueInfo?.degraded && (
+            <div className="rerank-note">The menu service is down, so this is our starter menu for the venue.</div>
+          )}
           <div className="rate-intro">Which dish did you have?</div>
+          {!venueDishes && <div className="loading">Loading the menu…</div>}
           <div className="venue-list">
-            {venueDishes.map((d) => (
+            {(venueDishes ?? []).map((d) => (
               <button
                 key={d.id}
                 className="venue-row"
@@ -339,11 +370,11 @@ export default function Review() {
                 }}
               >
                 <span className="venue-row-main">
-                  <span className="venue-row-name">
-                    {d.name}
-                    {d.userCreated && ' ✎'}
+                  <span className="venue-row-name">{d.name}</span>
+                  <span className="venue-row-meta">
+                    {money(d.price)}
+                    {d.source === 'OWNER' ? ' · official menu' : d.source === 'DINER' ? ' · added by a diner' : ''}
                   </span>
-                  <span className="venue-row-meta">${d.price.toFixed(2)}</span>
                 </span>
                 <span className="venue-row-scores">
                   <span className="pill ai">AI {d.predictedScore10}</span>
@@ -366,7 +397,7 @@ export default function Review() {
                 type="number"
                 min="0"
                 step="0.5"
-                placeholder="Price (S$)"
+                placeholder="Price you paid (S$, optional)"
                 value={newDishPrice}
                 onChange={(e) => setNewDishPrice(e.target.value)}
                 aria-label="New dish price"
@@ -379,6 +410,9 @@ export default function Review() {
             <button className="back-link" onClick={() => setAdding(true)}>
               + Add a dish that's not listed
             </button>
+          )}
+          {error && <div className="error">{error}</div>}
+          </>
           )}
         </>
       )}

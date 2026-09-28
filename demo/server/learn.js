@@ -1,5 +1,7 @@
-// Taste-learning engine: the profile starts as DEMO_USER and every review nudges it.
+// Taste-learning engine: every review nudges a user's profile.
 // Three channels: sentiment, duels, and review text (see reviewText.js).
+// Pure logic over a per-user `state` ({ profile, reviews, rankings }); where that
+// state lives (memory or Postgres) is services/learnerStore.js's job.
 
 import { DEMO_USER } from './match.js'
 import { matchSignals, countEvidence } from './reviewText.js'
@@ -18,59 +20,42 @@ export const SENTIMENTS = ['loved', 'fine', 'disliked']
 const SENTIMENT_RATING = { loved: 5, fine: 3, disliked: 1 }
 const SENTIMENT_ANCHOR = { loved: 8.5, fine: 5.5, disliked: 2.5 }
 
-let state
-export function resetState() {
-  state = {
-    profile: structuredClone(DEMO_USER),
-    reviews: [],
+// A learner's state. `profile` defaults to the demo persona (tests use it).
+export function createState(profile = DEMO_USER) {
+  return {
+    profile: structuredClone(profile),
+    reviews: [], // oldest first
     rankings: [], // dish ids, best first
-    userDishes: [],
   }
-  return state
-}
-resetState()
-
-export function getProfile() {
-  return state.profile
 }
 
-export function getReviews() {
-  return state.reviews
+// Where a new account starts: every known cuisine neutral, no history. The AI
+// has nothing to go on yet; reviews and duels move it from here.
+export function starterProfile(name = 'You') {
+  return {
+    name,
+    cuisineAffinity: Object.fromEntries(Object.keys(DEMO_USER.cuisineAffinity).map((c) => [c, 0.5])),
+    spicePref: 0.5,
+    richnessPref: 0.5,
+    priceComfort: 1,
+    adventurousness: 0.5,
+    recentlyEaten: [],
+  }
 }
 
-export function getRankings() {
-  return state.rankings
+// 0 = cheap, 1 = mid, 2 = pricey (S$).
+export function priceTierFor(price) {
+  const p = Number(price) || 0
+  return p >= 12 ? 2 : p > 6 ? 1 : 0
 }
 
-export function getUserDishes() {
-  return state.userDishes
-}
-
-export function getAccuracy() {
+export function getAccuracy(state) {
   const errors = state.reviews.map((r) => Math.abs(r.predicted - r.actual))
   const count = errors.length
   const running = count
     ? Math.round(100 - errors.reduce((a, b) => a + b, 0) / count)
     : null
   return { running, count }
-}
-
-export function addUserDish({ venueId, name, price }) {
-  const dish = {
-    id: 'user-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30) + '-' + state.userDishes.length,
-    venueId,
-    name,
-    price: Number(price) || 0,
-    priceTier: price >= 12 ? 2 : price > 6 ? 1 : 0,
-    // unknown taste features start neutral
-    spice: 0.5,
-    richness: 0.5,
-    novelty: 0.6,
-    tags: ['user-added'],
-    userCreated: true,
-  }
-  state.userDishes.push(dish)
-  return dish
 }
 
 // Predicts how much the user will like a dish (0-100) from the profile alone.
@@ -221,9 +206,10 @@ function collectDuelNudges(profile, duels, touch) {
   }
 }
 
-// Nudges from review text; signals repeated across past reviews compound.
-function collectTextNudges(profile, text, touch) {
+// Nudges from review text; signals repeated across the user's past reviews compound.
+function collectTextNudges(state, text, touch) {
   if (!text) return
+  const profile = state.profile
   const corpus = state.reviews.map((r) => r.text).filter(Boolean)
   for (const sig of matchSignals(text)) {
     const n = countEvidence(corpus, sig) + 1 // + this review
@@ -251,8 +237,8 @@ function collectTextNudges(profile, text, touch) {
   }
 }
 
-// Star-rating entry point.
-export function applyReview(dish, venue, rating, tags = []) {
+// Star-rating entry point. Mutates `state`; `review` in the result is the new record.
+export function applyReview(state, dish, venue, rating, tags = []) {
   const profile = state.profile
   const predicted = predictDishScore(dish, venue.cuisine, profile)
   const actual = Math.round(((rating - 1) / 4) * 100)
@@ -260,20 +246,30 @@ export function applyReview(dish, venue, rating, tags = []) {
   const { touch, deltas } = makeToucher()
   collectRatingNudges(profile, dish, venue.cuisine, rating, tags, touch)
 
-  state.reviews.push({
-    dishId: dish.id, rating, tags, predicted, actual, at: new Date().toISOString(),
-  })
+  const review = {
+    dishId: dish.id,
+    dishName: dish.name,
+    venueId: dish.venueId,
+    rating,
+    tags,
+    text: '',
+    predicted,
+    actual,
+    at: new Date().toISOString(),
+  }
+  state.reviews.push(review)
 
   return {
+    review,
     deltas: deltas(),
     prediction: { predicted, actual },
-    accuracy: getAccuracy(),
+    accuracy: getAccuracy(state),
     profile,
   }
 }
 
 // Beli-style entry point; duels arrive resolved as { winner, loser } dishes with cuisine.
-export function applyBeliReview(dish, venue, { sentiment, duels = [], insertIndex = 0, text = '' }) {
+export function applyBeliReview(state, dish, venue, { sentiment, duels = [], insertIndex = 0, text = '' }) {
   if (!SENTIMENTS.includes(sentiment)) throw new Error(`invalid sentiment "${sentiment}"`)
   const profile = state.profile
   const predicted = predictDishScore(dish, venue.cuisine, profile)
@@ -281,7 +277,7 @@ export function applyBeliReview(dish, venue, { sentiment, duels = [], insertInde
   const { touch, deltas } = makeToucher()
   collectRatingNudges(profile, dish, venue.cuisine, SENTIMENT_RATING[sentiment], [], touch)
   collectDuelNudges(profile, duels, touch)
-  collectTextNudges(profile, text, touch)
+  collectTextNudges(state, text, touch)
 
   // Re-reviewing moves the dish rather than duplicating it.
   state.rankings = state.rankings.filter((id) => id !== dish.id)
@@ -291,8 +287,10 @@ export function applyBeliReview(dish, venue, { sentiment, duels = [], insertInde
   const score10 = scoreFromRank(index, total, sentiment)
   const actual = Math.round(score10 * 10)
 
-  state.reviews.push({
+  const review = {
     dishId: dish.id,
+    dishName: dish.name,
+    venueId: dish.venueId,
     rating: SENTIMENT_RATING[sentiment],
     sentiment,
     tags: [],
@@ -301,14 +299,16 @@ export function applyBeliReview(dish, venue, { sentiment, duels = [], insertInde
     predicted,
     actual,
     at: new Date().toISOString(),
-  })
+  }
+  state.reviews.push(review)
 
   return {
+    review,
     deltas: deltas(),
     score10,
     rank: { index, total },
     prediction: { predicted, actual, predictedScore10: round1(predicted / 10) },
-    accuracy: getAccuracy(),
+    accuracy: getAccuracy(state),
     rankings: [...state.rankings],
     profile,
   }

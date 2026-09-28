@@ -1,26 +1,59 @@
 import { useEffect, useState } from 'react'
-import { getContext, getRecommendations, postReset } from './api.js'
+import { getContext, getRecommendations, postReset } from './api/engineApi.js'
+import { useAuth } from './auth/AuthContext.jsx'
 import ContextBanner from './components/ContextBanner.jsx'
 import Feed from './components/Feed.jsx'
-import MoodBar from './components/MoodBar.jsx'
 import Login from './components/Login.jsx'
+import MoodBar from './components/MoodBar.jsx'
 import Review from './components/Review.jsx'
 import TasteDna from './components/TasteDna.jsx'
+import Profile from './components/account/Profile.jsx'
+import Register from './components/account/Register.jsx'
+import RoleSwitcher, { ActingAsTape } from './components/account/RoleSwitcher.jsx'
+import AdminPanel from './components/admin/AdminPanel.jsx'
+import MyVenues from './components/owner/MyVenues.jsx'
 
-const USER_KEY = 'mm-demo-user'
-
-function loadUser() {
-  try {
-    return JSON.parse(sessionStorage.getItem(USER_KEY)) || null
-  } catch {
-    return null
-  }
+// Everyone gets the diner app; owners add "My venues", admins add "Admin".
+// The role is the one the server serves this session as (act-as applied).
+function tabsFor(role) {
+  const tabs = [
+    ['feed', 'For you'],
+    ['rate', 'Review'],
+    ['dna', 'Taste DNA'],
+    ['profile', 'Profile'],
+  ]
+  if (role === 'OWNER' || role === 'ADMIN') tabs.push(['venues', 'My venues'])
+  if (role === 'ADMIN') tabs.push(['admin', 'Admin'])
+  return tabs
 }
 
 export default function App() {
-  // Mock auth: no backend yet, so Login accepts anything. Kept in
-  // sessionStorage so a page refresh doesn't bounce you back to sign-in.
-  const [user, setUser] = useState(loadUser)
+  const { status } = useAuth()
+  const [screen, setScreen] = useState('login')
+
+  if (status === 'loading') {
+    return (
+      <div className="phone">
+        <div className="loading">Checking your session…</div>
+      </div>
+    )
+  }
+  if (status === 'signedOut') {
+    return (
+      <div className="phone">
+        {screen === 'register' ? (
+          <Register onHaveAccount={() => setScreen('login')} />
+        ) : (
+          <Login onCreateAccount={() => setScreen('register')} />
+        )}
+      </div>
+    )
+  }
+  return <SignedInApp />
+}
+
+function SignedInApp() {
+  const { me, role, logout } = useAuth()
   const [tab, setTab] = useState('feed')
   const [mode, setMode] = useState('idle') // idle | find | surprise
   const [mood, setMood] = useState('none')
@@ -31,18 +64,22 @@ export default function App() {
   const [error, setError] = useState(null)
   const [resetCount, setResetCount] = useState(0)
 
+  const tabs = tabsFor(role)
+  // Switching to a smaller role can take away the tab you were on.
+  const activeTab = tabs.some(([id]) => id === tab) ? tab : 'feed'
+
   // Idle landing still shows the live weather banner.
   useEffect(() => {
-    if (!user || tab !== 'feed' || mode !== 'idle') return
+    if (activeTab !== 'feed' || mode !== 'idle') return
     let cancelled = false
     getContext(simRain)
       .then((c) => { if (!cancelled) setContext(c) })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [user, tab, mode, simRain, resetCount])
+  }, [activeTab, mode, simRain, resetCount])
 
   useEffect(() => {
-    if (!user || tab !== 'feed' || mode === 'idle') return
+    if (activeTab !== 'feed' || mode === 'idle') return
     let cancelled = false
     setError(null)
     getRecommendations(mode, mood, simRain, exclude)
@@ -53,7 +90,7 @@ export default function App() {
       })
       .catch((err) => { if (!cancelled) setError(err.message) })
     return () => { cancelled = true }
-  }, [user, mode, mood, simRain, exclude, tab, resetCount])
+  }, [me.id, role, mode, mood, simRain, exclude, activeTab, resetCount])
 
   const startMode = (next) => {
     setRecs(null)
@@ -72,49 +109,32 @@ export default function App() {
     if (current) setExclude((ids) => [...ids, current.id])
   }
 
-  const resetDemo = async () => {
-    await postReset()
+  const resetTaste = async () => {
+    if (!window.confirm("Forget everything you've taught the AI? Your reviews, rankings and Taste DNA start over.")) return
+    try {
+      await postReset()
+    } catch (err) {
+      window.alert(`Couldn't reset: ${err.message}`)
+      return
+    }
     setMood('none')
     backToLanding()
-    setResetCount((n) => n + 1) // re-fetches feed and remounts the other tabs
+    setResetCount((n) => n + 1) // re-fetches the feed and remounts the other tabs
   }
 
-  const login = (u) => {
-    try { sessionStorage.setItem(USER_KEY, JSON.stringify(u)) } catch {}
-    setUser(u)
-  }
-
-  const logout = () => {
-    try { sessionStorage.removeItem(USER_KEY) } catch {}
-    setUser(null)
-    setTab('feed')
-    backToLanding()
-  }
-
-  if (!user) {
-    return (
-      <div className="phone">
-        <Login onLogin={login} />
-      </div>
-    )
-  }
-
-  const TABS = [
-    ['feed', 'For you'],
-    ['rate', 'Review'],
-    ['dna', 'Taste DNA'],
-  ]
+  // Remount tab content when the role changes, so it reloads with the new permissions.
+  const viewKey = `${role}-${resetCount}`
 
   return (
     <div className="phone">
       <header className="header">
         <div className="header-top">
-          <div className="eyebrow">The AI that learns your taste - team demo</div>
+          <div className="eyebrow">The AI that learns your taste</div>
           <div className="header-actions">
-            <button className="reset-btn" onClick={resetDemo}>
-              Reset demo
+            <button className="reset-btn" onClick={resetTaste} title="Forget what you've taught the AI">
+              Reset my taste
             </button>
-            <button className="reset-btn" onClick={logout} title={user.email}>
+            <button className="reset-btn" onClick={logout} title={`Signed in as ${me.email}`}>
               Log out
             </button>
           </div>
@@ -122,13 +142,14 @@ export default function App() {
         <h1>
           Makan<span className="accent">Match</span>
         </h1>
+        <RoleSwitcher />
         <nav className="tabs" role="tablist">
-          {TABS.map(([id, label]) => (
+          {tabs.map(([id, label]) => (
             <button
               key={id}
               className="tab"
               role="tab"
-              aria-selected={tab === id}
+              aria-selected={activeTab === id}
               onClick={() => setTab(id)}
             >
               {label}
@@ -136,8 +157,9 @@ export default function App() {
           ))}
         </nav>
       </header>
+      <ActingAsTape />
 
-      {tab === 'feed' && (
+      {activeTab === 'feed' && (
         <>
           <ContextBanner
             context={context}
@@ -145,7 +167,7 @@ export default function App() {
             onToggleRain={() => setSimRain((v) => !v)}
           />
           {error ? (
-            <div className="error">Feed unavailable: {error}. Is the API running on :3001?</div>
+            <div className="error">Feed unavailable: {error}</div>
           ) : (
             <Feed
               mode={mode}
@@ -160,8 +182,11 @@ export default function App() {
         </>
       )}
 
-      {tab === 'rate' && <Review key={resetCount} />}
-      {tab === 'dna' && <TasteDna key={resetCount} />}
+      {activeTab === 'rate' && <Review key={viewKey} />}
+      {activeTab === 'dna' && <TasteDna key={viewKey} />}
+      {activeTab === 'profile' && <Profile key={viewKey} />}
+      {activeTab === 'venues' && <MyVenues key={viewKey} />}
+      {activeTab === 'admin' && <AdminPanel key={viewKey} />}
     </div>
   )
 }

@@ -1,0 +1,138 @@
+/* ---------- admin: claims queue and accounts ---------- */
+
+.admin {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px 32px;
+}
+
+.admin-nav {
+  display: flex;
+  border: var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.admin-nav-btn {
+  flex: 1;
+  appearance: none;
+  border: none;
+  background: var(--paper);
+  font-family: var(--font-display);
+  font-size: 17px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 9px 6px 7px;
+  cursor: pointer;
+}
+
+.admin-nav-btn + .admin-nav-btn {
+  border-left: var(--line);
+}
+
+.admin-nav-btn[aria-current='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.admin-nav-btn:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: -4px;
+}
+
+.admin-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.claim-cards,
+.user-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.claim-card,
+.user-row {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  border: var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 12px 14px;
+}
+
+.claim-card-head,
+.user-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.claim-card .claim-venue,
+.user-name {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.user-badges {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* The proof is what the admin is judging, so it reads like a pasted note. */
+.claim-proof {
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 4px solid var(--kunyit);
+  background: var(--paper-dim);
+  font-family: var(--font-data);
+  font-size: 12.5px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.claim-card .claim-reason {
+  font-size: 13px;
+  color: var(--chili);
+}
+
+.reject-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.user-row.disabled {
+  background: var(--paper-dim);
+}
+
+.owned-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13.5px;
+}
+
+.owned-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
