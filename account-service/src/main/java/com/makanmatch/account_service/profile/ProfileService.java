@@ -50,8 +50,11 @@ public class ProfileService {
 		});
 	}
 
-	public void createForSignup(UUID id, String displayName) {
-		loadOrCreate(id, displayName).rename(clampName(displayName));
+	/** @param dietary null when the sign-up form skipped it */
+	public void createForSignup(UUID id, String displayName, DietaryNeeds dietary) {
+		Profile profile = loadOrCreate(id, displayName);
+		profile.rename(clampName(displayName));
+		if (dietary != null) profile.changeDietaryNeeds(dietary);
 	}
 
 	@Transactional(readOnly = true)
@@ -82,7 +85,7 @@ public class ProfileService {
 		Profile profile = get(id);
 		EffectiveRole reported = role != null ? role : EffectiveRole.natural(profile.isAdmin(), ownership.ownsAny(id));
 		return new MeResponse(profile.getId(), email, profile.getDisplayName(), profile.getUsername(),
-				profile.isAdmin(), reported, ownership.ownedBy(id), profile.getCreatedAt());
+				profile.getDietaryNeeds(), profile.isAdmin(), reported, ownership.ownedBy(id), profile.getCreatedAt());
 	}
 
 	public MeResponse update(UUID id, String email, EffectiveRole role, UpdateProfileRequest request) {
@@ -94,6 +97,9 @@ public class ProfileService {
 		}
 		if (request.username() != null) {
 			profile.changeUsername(checkedUsername(id, request.username()));
+		}
+		if (request.dietary() != null) {
+			profile.changeDietaryNeeds(request.dietary());
 		}
 		try {
 			profiles.saveAndFlush(profile);

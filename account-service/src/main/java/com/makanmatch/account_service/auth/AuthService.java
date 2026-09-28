@@ -50,7 +50,7 @@ public class AuthService {
 			if (e.isClientError()) throw new BadRequestException(e.getMessage());
 			throw e;
 		}
-		profiles.createForSignup(user.id(), displayName);
+		profiles.createForSignup(user.id(), displayName, request.dietary());
 		return new AuthResult(signIn(email, request.password()), user.id());
 	}
 

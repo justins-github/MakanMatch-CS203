@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import com.makanmatch.account_service.common.EffectiveRole;
 import com.makanmatch.account_service.owner.dto.OwnedVenueResponse;
+import com.makanmatch.account_service.profile.DietaryNeeds;
 
 /**
  * The signed-in account. Other services call GET /api/me with the user's token
@@ -19,6 +20,7 @@ public record MeResponse(
 		String email,
 		String displayName,
 		String username,
+		DietaryNeeds dietary,
 		boolean admin,
 		EffectiveRole effectiveRole,
 		List<OwnedVenueResponse> ownedVenues,

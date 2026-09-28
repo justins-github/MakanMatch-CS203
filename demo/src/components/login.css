@@ -189,3 +189,39 @@
 .login-hint.bad {
   color: var(--chili);
 }
+
+/* Optional dietary needs on the create-account form, folded away by default. */
+.login-diet {
+  border: 1.5px dashed var(--ink-soft);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.login-diet summary {
+  cursor: pointer;
+  font-family: var(--font-data);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.login-diet summary:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: 2px;
+}
+
+.login-diet[open] summary {
+  margin-bottom: 12px;
+}
+
+.login-diet .login-hint {
+  display: block;
+  margin-top: 10px;
+}
+
+.login-diet-count {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
+}

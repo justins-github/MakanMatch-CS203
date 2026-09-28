@@ -1,5 +1,6 @@
 package com.makanmatch.account_service.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
@@ -13,9 +14,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -26,11 +29,15 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.makanmatch.account_service.auth.AuthService.AuthResult;
+import com.makanmatch.account_service.auth.dto.SignupRequest;
 import com.makanmatch.account_service.common.ApiExceptionHandler;
 import com.makanmatch.account_service.common.EffectiveRole;
 import com.makanmatch.account_service.common.UnauthorizedException;
 import com.makanmatch.account_service.config.SecurityConfig;
 import com.makanmatch.account_service.owner.OwnershipService;
+import com.makanmatch.account_service.profile.DietaryNeeds;
+import com.makanmatch.account_service.profile.DietaryNeeds.Preference;
+import com.makanmatch.account_service.profile.DietaryNeeds.Restriction;
 import com.makanmatch.account_service.profile.ProfileService;
 import com.makanmatch.account_service.profile.dto.MeResponse;
 import com.makanmatch.account_service.security.ActAsResolver;
@@ -133,6 +140,22 @@ class AuthControllerTest {
 	}
 
 	@Test
+	void signupHandsTheDietaryNeedsToTheService() throws Exception {
+		given(auth.signup(any())).willReturn(new AuthResult(session("access-1", "refresh-1"), ID));
+		given(profiles.me(ID, "diner@example.com", null)).willReturn(me());
+
+		mvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"email\":\"a@example.com\",\"password\":\"hunter22x\",\"displayName\":\"A\","
+						+ "\"dietary\":{\"restrictions\":[\"VEGAN\"],\"preferences\":[\"LESS_SWEET\"]}}"))
+				.andExpect(status().isCreated());
+
+		ArgumentCaptor<SignupRequest> sent = ArgumentCaptor.forClass(SignupRequest.class);
+		verify(auth).signup(sent.capture());
+		assertThat(sent.getValue().dietary()).isEqualTo(
+				new DietaryNeeds(Set.of(Restriction.VEGAN), Set.of(Preference.LESS_SWEET), null));
+	}
+
+	@Test
 	void logoutEndsTheSessionAndClearsTheCookieEvenWithAnExpiredAccessToken() throws Exception {
 		// The stale Authorization header must not get in the way of signing out.
 		mvc.perform(post("/api/auth/logout").header(AuthController.CSRF_HEADER, "makanmatch")
@@ -154,7 +177,7 @@ class AuthControllerTest {
 	}
 
 	private static MeResponse me() {
-		return new MeResponse(ID, "diner@example.com", "Diner", "diner", false, EffectiveRole.USER, List.of(),
-				Instant.EPOCH);
+		return new MeResponse(ID, "diner@example.com", "Diner", "diner", new DietaryNeeds(Set.of(), Set.of(), null),
+				false, EffectiveRole.USER, List.of(), Instant.EPOCH);
 	}
 }
