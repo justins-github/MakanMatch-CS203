@@ -3,10 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n account,catalog,engine,web -c magenta,blue,yellow,cyan \"npm:dev:account\" \"npm:dev:catalog\" \"npm:dev:server\" \"npm:dev:client\"",
+    "dev": "concurrently -n account,catalog,engine,web -c magenta,blue,yellow,cyan \"npm run -s dev:account\" \"npm run -s dev:catalog\" \"npm run -s dev:server\" \"npm run -s dev:client\"",
+    "dev:verbose": "concurrently -n account,catalog,engine,web -c magenta,blue,yellow,cyan \"npm run -s dev:account -- --verbose\" \"npm run -s dev:catalog -- --verbose\" \"npm run -s dev:server\" \"npm run -s dev:client\"",
     "dev:account": "node ../scripts/run-service.mjs account-service",
     "dev:catalog": "node ../scripts/run-service.mjs catalog-service",
-    "dev:server": "nodemon --watch server --ignore server/.data --ignore \"*.test.js\" server/index.js",
+    "dev:server": "nodemon -q --watch server --ignore server/.data --ignore \"*.test.js\" server/index.js",
     "dev:client": "vite",
     "test": "node --test \"server/**/*.test.js\"",
     "migrate": "node server/db/migrate.js"
