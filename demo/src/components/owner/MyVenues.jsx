@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getVenue } from '../../api/catalogApi.js'
 import { useAuth } from '../../auth/AuthContext.jsx'
+import { Accordion } from '../Accordion.jsx'
 import MenuEditor from './MenuEditor.jsx'
 import OpeningHoursForm from './OpeningHoursForm.jsx'
 import VenueStatusForm from './VenueStatusForm.jsx'
@@ -40,9 +41,11 @@ function VenueDetail({ venueId, onBack }) {
           </div>
         </header>
       )}
-      <VenueStatusForm venueId={venueId} />
-      <OpeningHoursForm venueId={venueId} />
-      <MenuEditor venueId={venueId} />
+      <Accordion>
+        <VenueStatusForm venueId={venueId} />
+        <OpeningHoursForm venueId={venueId} />
+        <MenuEditor venueId={venueId} />
+      </Accordion>
     </>
   )
 }

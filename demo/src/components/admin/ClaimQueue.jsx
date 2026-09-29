@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { approveClaim, listClaims, rejectClaim } from '../../api/accountApi.js'
+import { approveClaim, listClaims, rejectClaim, withdrawClaim } from '../../api/accountApi.js'
 import { useAuth } from '../../auth/AuthContext.jsx'
+import { Accordion, Fold, Unsaved } from '../Accordion.jsx'
 
 const FILTERS = [
   { id: 'PENDING', label: 'Waiting' },
@@ -30,48 +31,60 @@ function ClaimCard({ claim, isMine, onDecided }) {
 
   const who = claim.claimant.displayName ?? 'Unknown account'
   return (
-    <li className="claim-card">
-      <div className="claim-card-head">
-        <span className="claim-venue">{claim.venueName}</span>
-        <span className={`pill ${claim.status.toLowerCase()}`}>{claim.status.toLowerCase()}</span>
-      </div>
-      <div className="venue-row-meta">
-        {who}
-        {claim.claimant.username && ` · @${claim.claimant.username}`} · {when(claim.createdAt)} · {claim.venueId}
-      </div>
-      <blockquote className="claim-proof">{claim.proof}</blockquote>
-      {claim.rejectReason && <div className="claim-reason">Rejected: “{claim.rejectReason}”</div>}
+    <li>
+      <Fold
+        id={claim.id}
+        sub
+        title={claim.venueName}
+        summary={`${isMine ? 'You' : who} · ${when(claim.createdAt)}`}
+        aside={<span className={`pill ${claim.status.toLowerCase()}`}>{claim.status.toLowerCase()}</span>}
+      >
+        <div className="venue-row-meta">
+          {who}
+          {claim.claimant.username && ` · @${claim.claimant.username}`} · {when(claim.createdAt)} · {claim.venueId}
+        </div>
+        <blockquote className="claim-proof">{claim.proof}</blockquote>
+        {claim.rejectReason && <div className="claim-reason">Rejected: “{claim.rejectReason}”</div>}
 
-      {claim.status === 'PENDING' && (
-        isMine ? (
-          <p className="panel-note">This is your own claim. Another admin has to review it.</p>
-        ) : rejecting ? (
-          <div className="reject-box">
-            <label className="field">
-              <span>Why? {claim.claimant.displayName ?? 'They'} will see this</span>
-              <textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} placeholder="We couldn't match the UEN to this venue" autoFocus />
-            </label>
+        {claim.status === 'PENDING' && (
+          isMine ? (
+            <>
+              <p className="panel-note">This is your own claim, so another admin has to approve or reject it.</p>
+              <div className="row-actions">
+                <button type="button" className="btn quiet" disabled={busy} onClick={() => decide(() => withdrawClaim(claim.id))}>
+                  Withdraw my claim
+                </button>
+              </div>
+            </>
+          ) : rejecting ? (
+            <div className="reject-box">
+              <label className="field">
+                <span>Why? {claim.claimant.displayName ?? 'They'} will see this</span>
+                <textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} placeholder="We couldn't match the UEN to this venue" autoFocus />
+              </label>
+              <div className="row-actions">
+                <button type="button" className="btn stop" disabled={!reason.trim() || busy} onClick={() => decide(() => rejectClaim(claim.id, reason.trim()))}>
+                  Reject claim
+                </button>
+                <button type="button" className="btn quiet" onClick={() => setRejecting(false)}>
+                  Back
+                </button>
+              </div>
+              <Unsaved when={reason.trim() !== ''} />
+            </div>
+          ) : (
             <div className="row-actions">
-              <button type="button" className="btn stop" disabled={!reason.trim() || busy} onClick={() => decide(() => rejectClaim(claim.id, reason.trim()))}>
-                Reject claim
+              <button type="button" className="btn go" disabled={busy} onClick={() => decide(() => approveClaim(claim.id))}>
+                Approve: {who} manages {claim.venueName}
               </button>
-              <button type="button" className="btn quiet" onClick={() => setRejecting(false)}>
-                Back
+              <button type="button" className="btn stop" disabled={busy} onClick={() => setRejecting(true)}>
+                Reject…
               </button>
             </div>
-          </div>
-        ) : (
-          <div className="row-actions">
-            <button type="button" className="btn go" disabled={busy} onClick={() => decide(() => approveClaim(claim.id))}>
-              Approve: {who} manages {claim.venueName}
-            </button>
-            <button type="button" className="btn stop" disabled={busy} onClick={() => setRejecting(true)}>
-              Reject…
-            </button>
-          </div>
-        )
-      )}
-      {error && <div className="error">{error}</div>}
+          )
+        )}
+        {error && <div className="error">{error}</div>}
+      </Fold>
     </li>
   )
 }
@@ -94,8 +107,25 @@ export default function ClaimQueue() {
     load()
   }, [filter])
 
+  // Your own pending claims need another admin, so they don't count as yours to review.
+  const shown = FILTERS.find((f) => f.id === filter)
+  const pending = claims?.filter((c) => c.status === 'PENDING') ?? []
+  const mine = pending.filter((c) => c.claimant.id === me.id).length
+  const toReview = pending.length - mine
+  const summary = claims && [
+    claims.length === 0 && filter === 'PENDING' ? 'Nothing waiting' : `${claims.length} ${filter === 'ALL' ? 'in total' : shown.label.toLowerCase()}`,
+    mine > 0 && (mine === 1 ? '1 is yours' : `${mine} are yours`),
+  ].filter(Boolean).join(' · ')
+
   return (
-    <section className="admin-section">
+    <Fold
+      id="claims"
+      title="Venue claims"
+      summary={summary}
+      aside={toReview > 0 && <span className="pill pending">{toReview} to review</span>}
+      onOpen={load}
+    >
+      <p className="panel-note">Check the proof, then approve or reject. Approving makes the claimant an owner of that venue.</p>
       <div className="filter-row" role="group" aria-label="Show claims">
         {FILTERS.map((f) => (
           <button key={f.id} type="button" className="chip" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
@@ -109,12 +139,14 @@ export default function ClaimQueue() {
         <p className="panel-note">{filter === 'PENDING' ? 'Nothing waiting. New claims show up here.' : 'No claims here.'}</p>
       )}
       {claims?.length > 0 && (
-        <ul className="claim-cards">
-          {claims.map((c) => (
-            <ClaimCard key={c.id} claim={c} isMine={c.claimant.id === me.id} onDecided={load} />
-          ))}
-        </ul>
+        <Accordion>
+          <ul className="fold-list">
+            {claims.map((c) => (
+              <ClaimCard key={c.id} claim={c} isMine={c.claimant.id === me.id} onDecided={load} />
+            ))}
+          </ul>
+        </Accordion>
       )}
-    </section>
+    </Fold>
   )
 }
