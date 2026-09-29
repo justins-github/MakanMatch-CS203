@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { addDish, getMenu, reportPrice, updateDish } from '../../api/catalogApi.js'
+import { Accordion, Fold, Unsaved, useAccordion } from '../Accordion.jsx'
 import MenuPhotoScan from './MenuPhotoScan.jsx'
 import PriceListEditor from './PriceListEditor.jsx'
 
@@ -27,47 +28,54 @@ function DishRow({ dish, onChanged }) {
 
   const setOfficial = (value) => run(() => reportPrice(dish.id, Number(value)))
 
-  return (
-    <li className={`menu-row${dish.priceConflict ? ' conflict' : ''}`}>
-      <div className="menu-head">
-        <span className="menu-name">{dish.name}</span>
-        <span className="menu-price">{money(dish.officialPrice) ?? money(dish.price) ?? 'no price'}</span>
-      </div>
-      <div className="menu-meta">
-        {SOURCE[dish.source]}
-        {dish.officialPrice == null && ' · price not confirmed by you yet'}
-      </div>
+  const aside = (
+    <>
+      {dish.priceConflict && <span className="pill rejected">Check price</span>}
+      <span className="menu-price">{money(dish.officialPrice) ?? money(dish.price) ?? 'no price'}</span>
+    </>
+  )
 
-      {dish.priceConflict && (
-        <div className="price-stamp" role="note">
-          <strong>Diners paid {money(dish.communityPrice)}</strong> since you set {money(dish.officialPrice)}.
-          Update the menu if the price changed.
-          <button type="button" className="btn stamp-btn" disabled={busy} onClick={() => setOfficial(dish.communityPrice)}>
-            Make {money(dish.communityPrice)} official
+  return (
+    <li>
+      <Fold
+        id={dish.id}
+        sub
+        title={dish.name}
+        summary={`${SOURCE[dish.source]}${dish.officialPrice == null ? ' · price unconfirmed' : ''}`}
+        aside={aside}
+      >
+        {dish.priceConflict && (
+          <div className="price-stamp" role="note">
+            <strong>Diners paid {money(dish.communityPrice)}</strong> since you set {money(dish.officialPrice)}.
+            Update the menu if the price changed.
+            <button type="button" className="btn stamp-btn" disabled={busy} onClick={() => setOfficial(dish.communityPrice)}>
+              Make {money(dish.communityPrice)} official
+            </button>
+          </div>
+        )}
+
+        <div className="menu-actions">
+          <input
+            className="price-input"
+            type="number"
+            min="0.1"
+            step="0.1"
+            inputMode="decimal"
+            placeholder="New price"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            aria-label={`New official price for ${dish.name}`}
+          />
+          <button type="button" className="btn go" disabled={!price || busy} onClick={() => setOfficial(price)}>
+            Set price
+          </button>
+          <button type="button" className="btn quiet" disabled={busy} onClick={() => run(() => updateDish(dish.id, { archived: true }))}>
+            Remove
           </button>
         </div>
-      )}
-
-      <div className="menu-actions">
-        <input
-          className="price-input"
-          type="number"
-          min="0.1"
-          step="0.1"
-          inputMode="decimal"
-          placeholder="New price"
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-          aria-label={`New official price for ${dish.name}`}
-        />
-        <button type="button" className="btn go" disabled={!price || busy} onClick={() => setOfficial(price)}>
-          Set price
-        </button>
-        <button type="button" className="btn quiet" disabled={busy} onClick={() => run(() => updateDish(dish.id, { archived: true }))}>
-          Remove
-        </button>
-      </div>
-      {error && <div className="error">{error}</div>}
+        <Unsaved when={price !== ''} />
+        {error && <div className="error">{error}</div>}
+      </Fold>
     </li>
   )
 }
@@ -75,6 +83,7 @@ function DishRow({ dish, onChanged }) {
 // The official menu. Diners' price reports are kept separately, so when what
 // diners paid drifts from what the menu says, the owner sees it here.
 export default function MenuEditor({ venueId }) {
+  const accordion = useAccordion()
   const [dishes, setDishes] = useState(null)
   const [name, setName] = useState('')
   const [price, setPrice] = useState('')
@@ -136,20 +145,23 @@ export default function MenuEditor({ venueId }) {
   }
 
   const conflicts = dishes?.filter((d) => d.priceConflict).length ?? 0
+  const summary = dishes && [
+    `${dishes.length} dish${dishes.length === 1 ? '' : 'es'}`,
+    conflicts > 0 && `${conflicts} price${conflicts === 1 ? '' : 's'} to check`,
+  ].filter(Boolean).join(' · ')
 
   if (editing) {
     return (
-      <section className="panel">
+      <Fold id="menu" title="Menu and prices" summary={summary}>
         <div className="panel-title">{scan ? 'Check your menu photo' : 'Edit price list'}</div>
         {!scan && <p className="panel-note">Type new prices, add dishes, tick dishes to remove, then save them all at once.</p>}
         <PriceListEditor venueId={venueId} dishes={dishes} scan={scan} onSaved={listSaved} onCancel={stopEditing} />
-      </section>
+      </Fold>
     )
   }
 
   return (
-    <section className="panel">
-      <div className="panel-title">Menu and prices</div>
+    <Fold id="menu" title="Menu and prices" summary={summary}>
       {dishes && (
         <>
           <div className="row-actions">
@@ -157,7 +169,7 @@ export default function MenuEditor({ venueId }) {
               Edit price list
             </button>
           </div>
-          <MenuPhotoScan venueId={venueId} onRead={photoRead} />
+          <MenuPhotoScan venueId={venueId} onStart={() => accordion?.setOpen('menu')} onRead={photoRead} />
         </>
       )}
       {savedNote && <div className="ok-note">{savedNote}</div>}
@@ -169,11 +181,13 @@ export default function MenuEditor({ venueId }) {
       {!dishes && !error && <div className="loading">Loading the menu…</div>}
       {dishes?.length === 0 && <p className="panel-note">No dishes yet. Add your first one below.</p>}
       {dishes?.length > 0 && (
-        <ul className="menu-list">
-          {dishes.map((d) => (
-            <DishRow key={d.id} dish={d} onChanged={load} />
-          ))}
-        </ul>
+        <Accordion>
+          <ul className="fold-list">
+            {dishes.map((d) => (
+              <DishRow key={d.id} dish={d} onChanged={load} />
+            ))}
+          </ul>
+        </Accordion>
       )}
 
       <form className="menu-add" onSubmit={add}>
@@ -183,7 +197,8 @@ export default function MenuEditor({ venueId }) {
           Add dish
         </button>
       </form>
+      <Unsaved when={name.trim() !== '' || price !== ''} />
       {error && <div className="error">{error}</div>}
-    </section>
+    </Fold>
   )
 }

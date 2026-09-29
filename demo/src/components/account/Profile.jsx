@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { changePassword, myClaims, updateMe, withdrawClaim } from '../../api/accountApi.js'
 import { useAuth } from '../../auth/AuthContext.jsx'
+import { Accordion, Fold, Unsaved } from '../Accordion.jsx'
 import ClaimVenue from './ClaimVenue.jsx'
-import DietaryPicker, { NO_DIETARY_NEEDS, sameDietaryNeeds } from './DietaryPicker.jsx'
+import DietaryPicker, { NO_DIETARY_NEEDS, dietaryLabels, sameDietaryNeeds } from './DietaryPicker.jsx'
 import './account.css'
 
 const ROLE_LABEL = { USER: 'Diner', OWNER: 'Owner', ADMIN: 'Admin' }
@@ -32,18 +33,22 @@ function DetailsForm() {
     }
   }
 
+  const edit = (set) => (e) => {
+    set(e.target.value)
+    setMessage(null)
+  }
+
   return (
-    <form className="panel" onSubmit={save}>
-      <div className="panel-title">Your details</div>
+    <Fold id="details" title="Your details" summary={me.username ? `${me.displayName} · @${me.username}` : me.displayName} onSubmit={save}>
       <label className="field">
         <span>Display name</span>
-        <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={40} required />
+        <input value={displayName} onChange={edit(setDisplayName)} maxLength={40} required />
       </label>
       <label className="field">
         <span>Username</span>
         <input
           value={username}
-          onChange={(e) => setUsername(e.target.value)}
+          onChange={edit(setUsername)}
           maxLength={20}
           autoCapitalize="none"
           spellCheck="false"
@@ -57,7 +62,8 @@ function DetailsForm() {
           {busy ? 'Saving…' : 'Save details'}
         </button>
       </div>
-    </form>
+      <Unsaved when={changed} />
+    </Fold>
   )
 }
 
@@ -86,9 +92,9 @@ function DietaryForm() {
   }
 
   return (
-    <form className="panel" onSubmit={save}>
-      <div className="panel-title">Dietary needs</div>
+    <Fold id="dietary" title="Dietary needs" summary={dietaryLabels(saved).join(', ') || 'Nothing set'} onSubmit={save}>
       <DietaryPicker
+        folded
         value={dietary}
         onChange={(next) => {
           setDietary(next)
@@ -101,7 +107,8 @@ function DietaryForm() {
           {busy ? 'Saving…' : 'Save dietary needs'}
         </button>
       </div>
-    </form>
+      <Unsaved when={changed} />
+    </Fold>
   )
 }
 
@@ -128,8 +135,7 @@ function PasswordForm() {
   }
 
   return (
-    <form className="panel" onSubmit={save}>
-      <div className="panel-title">Change password</div>
+    <Fold id="password" title="Change password" onSubmit={save}>
       <label className="field">
         <span>Current password</span>
         <input type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} required />
@@ -145,7 +151,8 @@ function PasswordForm() {
           {busy ? 'Changing…' : 'Change password'}
         </button>
       </div>
-    </form>
+      <Unsaved when={current !== '' || next !== ''} />
+    </Fold>
   )
 }
 
@@ -178,9 +185,14 @@ function Claims() {
     await Promise.all([load(), reloadMe()])
   }
 
+  const waiting = claims?.filter((c) => c.status === 'PENDING').length ?? 0
+  const summary = [
+    me.ownedVenues.map((v) => v.venueName).join(', '),
+    waiting > 0 && `${waiting} claim${waiting === 1 ? '' : 's'} waiting`,
+  ].filter(Boolean).join(' · ') || 'None yet'
+
   return (
-    <section className="panel">
-      <div className="panel-title">Venues you run</div>
+    <Fold id="venues" title="Venues you run" summary={summary}>
       {me.ownedVenues.length > 0 ? (
         <ul className="plain-list">
           {me.ownedVenues.map((v) => (
@@ -225,7 +237,7 @@ function Claims() {
           </button>
         </div>
       )}
-    </section>
+    </Fold>
   )
 }
 
@@ -244,10 +256,12 @@ export default function Profile() {
           {me.admin && me.effectiveRole !== 'ADMIN' && <span className="pill quiet">Admin account</span>}
         </div>
       </header>
-      <DetailsForm />
-      <DietaryForm />
-      <Claims />
-      <PasswordForm />
+      <Accordion>
+        <DetailsForm />
+        <DietaryForm />
+        <Claims />
+        <PasswordForm />
+      </Accordion>
     </main>
   )
 }

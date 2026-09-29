@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { editMenu } from '../../api/catalogApi.js'
+import { Unsaved } from '../Accordion.jsx'
 
 const money = (v) => (v == null ? '-' : `$${Number(v).toFixed(2)}`)
 let nextKey = 0
@@ -152,6 +153,7 @@ export default function PriceListEditor({ venueId, dishes, scan, onSaved, onCanc
           Cancel
         </button>
       </div>
+      <Unsaved when={count > 0} />
     </form>
   )
 }

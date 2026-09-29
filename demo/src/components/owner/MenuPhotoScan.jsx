@@ -30,7 +30,8 @@ const canReadClipboard = typeof navigator !== 'undefined' && typeof navigator.cl
 // Take a photo of the menu, pick one, or paste a screenshot (button or Ctrl+V
 // anywhere on the page). The catalog reads it and onRead gets
 // { sample, dishes: [{ name, price, dishId }], photoUrl } for the owner to review.
-export default function MenuPhotoScan({ venueId, onRead }) {
+// onStart fires as soon as a photo comes in, so a closed menu section can open.
+export default function MenuPhotoScan({ venueId, onStart, onRead }) {
   const [busy, setBusy] = useState(false)
   const [preview, setPreview] = useState(null)
   const [error, setError] = useState(null)
@@ -39,6 +40,7 @@ export default function MenuPhotoScan({ venueId, onRead }) {
 
   const scan = async (file) => {
     if (busy) return
+    onStart?.()
     setError(null)
     setBusy(true)
     let url = null

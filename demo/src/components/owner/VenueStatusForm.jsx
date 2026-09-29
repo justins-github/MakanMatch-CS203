@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getVenueUpdates, reportVenueStatus } from '../../api/catalogApi.js'
+import { Fold, Unsaved } from '../Accordion.jsx'
 
 const STATUSES = [
   { id: 'OPEN', label: 'Open as usual', cls: 'open' },
@@ -57,9 +58,10 @@ export default function VenueStatusForm({ venueId }) {
   // A move stays true after later updates, so diners see the latest moved-to address.
   const movedTo = history?.find((u) => u.status === 'MOVED')?.newAddress
 
+  const summary = current ? `Diners see: ${STATUS_LABEL[current.status]}` : history && 'Nothing posted yet'
+
   return (
-    <section className="panel">
-      <div className="panel-title">Tell diners what changed</div>
+    <Fold id="status" title="Tell diners what changed" summary={summary}>
       <div className="status-now">
         {current ? (
           <>
@@ -114,6 +116,7 @@ export default function VenueStatusForm({ venueId }) {
             </button>
           </div>
         )}
+        <Unsaved when={status !== null} />
       </form>
 
       {history?.length > 1 && (
@@ -130,6 +133,6 @@ export default function VenueStatusForm({ venueId }) {
           </ul>
         </details>
       )}
-    </section>
+    </Fold>
   )
 }

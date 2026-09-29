@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getHours, setHours } from '../../api/catalogApi.js'
+import { Fold, Unsaved } from '../Accordion.jsx'
 
 const DAYS = [
   ['MONDAY', 'Mon'],
@@ -40,15 +41,19 @@ const toWeek = (rows) =>
 // that are shut right now. Up to two sessions a day (lunch and dinner service).
 export default function OpeningHoursForm({ venueId }) {
   const [rows, setRows] = useState(null)
+  const [savedRows, setSavedRows] = useState(null) // what diners see now
   const [updatedAt, setUpdatedAt] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [saved, setSaved] = useState(false)
 
   const show = (hours) => {
-    setRows(toRows(hours.week))
+    const shown = toRows(hours.week)
+    setRows(shown)
+    setSavedRows(shown)
     setUpdatedAt(hours.updatedAt)
   }
+  const changed = rows !== null && JSON.stringify(toWeek(rows)) !== JSON.stringify(toWeek(savedRows))
 
   useEffect(() => {
     getHours(venueId)
@@ -91,9 +96,11 @@ export default function OpeningHoursForm({ venueId }) {
     }
   }
 
+  const openDays = savedRows?.filter((r) => r.mode !== 'closed').length
+  const summary = !savedRows ? null : updatedAt ? `Open ${openDays} day${openDays === 1 ? '' : 's'} a week · updated ${when(updatedAt)}` : 'Not set yet'
+
   return (
-    <section className="panel">
-      <div className="panel-title">Opening hours</div>
+    <Fold id="hours" title="Opening hours" summary={summary}>
       <div className="status-now">
         {updatedAt ? (
           <>
@@ -164,9 +171,10 @@ export default function OpeningHoursForm({ venueId }) {
               Copy Monday to every day
             </button>
           </div>
+          <Unsaved when={changed} />
         </form>
       )}
       {!rows && error && <div className="error">{error}</div>}
-    </section>
+    </Fold>
   )
 }

@@ -1,192 +1,400 @@
 # MakanMatch
 
-Singapore food discovery that learns your taste. Diners rank dishes and get
-personalised recommendations; owners keep their venue's status, menu and prices
-right; admins verify owners and manage accounts.
+**Singapore food discovery that learns your taste.**
 
-## How it fits together
+Rate what you eat and MakanMatch learns what you like. Every rating, head-to-head
+comparison and written review updates your personal *Taste DNA*, which then ranks
+~21,700 real Singapore food venues by how well each one suits you. The app explains
+every recommendation. Venue owners keep their own listings accurate, and admins
+verify who owns what.
 
+A CS203 team project at SMU.
+
+![React 18](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
+![Node.js 20](https://img.shields.io/badge/Node.js-20.12%2B-339933?logo=nodedotjs&logoColor=white)
+![Spring Boot 4](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
+![Java 17](https://img.shields.io/badge/Java-17%2B-ED8B00?logo=openjdk&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20Auth-3FCF8E?logo=supabase&logoColor=white)
+
+## Contents
+
+- [What it does](#what-it-does)
+- [How it works](#how-it-works)
+- [Tech stack](#tech-stack)
+- [Repository layout](#repository-layout)
+- [First-time setup](#first-time-setup)
+- [Running the tests](#running-the-tests)
+- [Useful commands](#useful-commands)
+- [Troubleshooting](#troubleshooting)
+- [Project status](#project-status)
+- [Contributing](#contributing)
+- [Data sources](#data-sources)
+
+## What it does
+
+### For diners
+
+- **Find me a restaurant**: the ten best matches within a 20-minute walk. Each
+  one has a match score, a confidence level and "why" chips explaining the score.
+- **Surprise me**: one pick from a cuisine your Taste DNA hasn't explored yet.
+- **Live context**: when data.gov.sg forecasts rain, the feed re-ranks towards
+  sheltered venues. Venues closed right now drop out, with the reason shown. Mood
+  chips (soupy, spicy, light) nudge the ranking further.
+- **Review**: search every venue, pick a dish (or add one the menu is missing)
+  and rate it. You give it a sentiment, settle up to three head-to-head duels
+  against dishes you've already ranked, and can add a written review.
+- **Taste DNA**: the learned profile, with six taste dimensions, per-cuisine
+  affinities and a model-accuracy meter that climbs as its predictions improve.
+- **Profile**: display name, password and dietary needs (restrictions,
+  preferences and spice level).
+
+### For venue owners
+
+Any diner can claim a venue by submitting proof, and an admin approves the claim.
+Owners then get a **My venues** tab where they can:
+
+- post status updates: open as usual, closed for now, closed for good, or moved
+  (with the new address);
+- set weekly opening hours, including split sessions and hours past midnight;
+- edit the whole menu and its official prices in one table, or start from a
+  photo of the printed menu;
+- resolve price conflicts when diners report paying something different.
+
+### For admins
+
+- approve or reject venue claims, and revoke ownership;
+- promote and demote admins, and disable accounts;
+- use **View as** to see the app as a diner or an owner. The server applies that
+  role's permissions for real, so it is a genuine test.
+
+"Owner" isn't a stored role: an account is an owner when it manages at least one
+venue. Owners can't review their own venues, and admins can't approve their own
+claims.
+
+## How it works
+
+### Architecture
+
+```mermaid
+flowchart TB
+    web["<b>Web app</b><br/>React · :5203"]
+
+    subgraph services ["MakanMatch services"]
+        engine["<b>engine</b><br/>Express · :3001"]
+        catalog["<b>catalog-service</b><br/>Spring Boot · :8083"]
+        account["<b>account-service</b><br/>Spring Boot · :8082"]
+        engine --> catalog
+        catalog -- "who may do what?" --> account
+        engine --> account
+    end
+
+    subgraph external ["External"]
+        nea["data.gov.sg<br/>2-hour forecast"]
+        db[("Supabase Postgres<br/>accounts · catalog · taste")]
+        auth["Supabase Auth"]
+    end
+
+    web -- "every other /api/**" --> engine
+    web -- "/api/catalog/**" --> catalog
+    web -- "/api/auth, /api/me, /api/claims,<br/>/api/owner, /api/admin" --> account
+
+    engine --> nea
+    engine --> db
+    catalog --> db
+    account --> db
+    account --> auth
 ```
-Browser (React, :5203) ── one origin; the browser never talks to Supabase or holds a Supabase key
-  │
-  ├─ /api/auth /api/me /api/claims /api/owner /api/admin ──► account-service  (Spring Boot, :8082)
-  │                                                            ├─ Supabase Auth: passwords, tokens, bans
-  │                                                            └─ Postgres schema "accounts"
-  ├─ /api/catalog/** ──────────────────────────────────────► catalog-service  (Spring Boot, :8083)
-  │                                                            ├─ Postgres schema "catalog"
-  │                                                            └─ asks account-service "what may this caller do?"
-  └─ every other /api/** ──────────────────────────────────► engine           (Express, :3001)
-                                                               ├─ Postgres schema "taste" (+ pgvector)
-                                                               └─ asks account-service and catalog-service
-```
 
-| Part | Owns | Folder |
+| Service | Responsibility | Folder |
 |---|---|---|
-| **account-service** | sign-up/login (on Supabase Auth), profiles and usernames, roles, venue ownership claims, admin user management | `account-service/` |
-| **catalog-service** | the 21.7k-venue registry (Overture Maps + curated seeds), owner status reports, dishes, price history | `catalog-service/` |
-| **engine** | recommendations, venue search, reviews, rankings, the learned Taste DNA | `demo/server/` |
-| **web app** | every screen | `demo/src/` |
+| **account-service** | Sign-up and login (on Supabase Auth), profiles, roles, venue ownership claims, admin tools | [`account-service/`](account-service) |
+| **catalog-service** | The venue registry (Overture Maps plus curated seeds), owner status reports, opening hours, dishes, price history, menu-photo scans | [`catalog-service/`](catalog-service) |
+| **engine** | Recommendations, venue search, reviews, rankings and the learned Taste DNA | [`demo/server/`](demo/server) |
+| **web app** | Every screen | [`demo/src/`](demo/src) |
+| **context-service** | OneMap walking times and NEA weather, with rain-adjusted ranking. It runs on its own for now ([details](context-service/README.md)) | [`context-service/`](context-service) |
 
-Rules the code follows (and `ArchitectureTest` checks for the Spring services):
-each service reads and writes **only its own schema**; services call each other
-over HTTP in one direction only (catalog → account, engine → account + catalog);
-inside a service, controllers → services → repositories, and features never
-depend on each other in a circle.
+The code follows three rules:
+
+- **Each service owns one database schema** and never reads or writes another's.
+- **Services call each other in one direction only**: catalog → account, and
+  engine → account + catalog. Inside each Spring service, controllers call
+  services, services call repositories, and features never depend on each other
+  in a circle. An ArchUnit `ArchitectureTest` enforces this.
+- **The browser sees a single origin.** In development, Vite's proxy routes each
+  `/api/...` path to the right service. In production, the host's rewrites do the
+  same job. This is what lets the refresh cookie be `SameSite=Strict`.
+
+### How recommendations work
+
+The engine scores every venue for the signed-in diner:
+
+```
+score = 50 + cuisine affinity
+           + spice, richness and price fit   (only where the venue's data is known)
+           + taste-vector similarity
+           − distance − recent-cuisine fatigue ± context (rain, mood)
+```
+
+Two principles shape it:
+
+- **A venue can't claim a match the data doesn't support.** The score is capped
+  by how many of the venue's attributes are known and how many reviews it has.
+  A barebones listing can't show a 99% match.
+- **The scoring is the explanation.** Every term that applies emits a
+  human-readable chip, such as *"Similar to places you've rated well"* or
+  *"Sheltered - good in this rain"*.
+
+Taste DNA learns from three channels: the sentiment you pick, each head-to-head
+duel (treated as a preference pair), and your written reviews, which are matched
+against your own past reviews. For the taste-vector term, each venue gets a
+sentence embedding (all-MiniLM-L6-v2, built offline, so the server runs no model
+at request time). The engine compares it with the average embedding of venues you
+rated above 5/10. [`demo/README.md`](demo/README.md) has the full formula and
+walks through each screen.
+
+### Security at a glance
+
+- **Passwords never touch our code or database.** Supabase Auth stores and checks
+  them.
+- **Tokens:** the access token (about 1 hour) is kept only in page memory. The
+  refresh token lives in an `HttpOnly`, `SameSite=Strict` cookie scoped to
+  `/api/auth` and rotates on every use.
+- **Every service verifies tokens itself**: the ES256 signature against
+  Supabase's published keys, plus expiry, issuer and audience. Roles come from
+  our database, not the token, so promoting, demoting or disabling an account
+  takes effect within 30 seconds everywhere.
+- **Guard rails:** login throttling, one generic message for failed logins, no
+  approving your own claim, and the last active admin can't be removed.
+
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Web app | React 18, Vite 5, Leaflet with OpenStreetMap tiles |
+| Engine | Node.js 20, Express 4, `jose` (JWT verification), `pg` with pgvector, PGlite for tests |
+| Account and catalog services | Java 17, Spring Boot 4.1, Spring Security (OAuth2 resource server), Spring Data JPA, Flyway, springdoc-openapi, ArchUnit |
+| Context service | Spring Boot 4.1, Caffeine cache, OneMap routing API, NEA forecast API |
+| Platform | Supabase (Postgres and Auth) |
+| Offline data tools | DuckDB (Overture Maps extraction), transformers.js (venue embeddings) |
+
+## Repository layout
+
+```
+.
+├── account-service/   Spring Boot: accounts, roles, claims, admin
+├── catalog-service/   Spring Boot: venues, status reports, hours, menus, prices
+├── context-service/   Spring Boot: walking times and weather (standalone for now)
+├── demo/
+│   ├── server/        Express recommendation engine
+│   └── src/           React web app
+├── scripts/           venue extraction and loading, seeding, dev service runner
+├── .github/           commit message conventions
+└── .env.example       every setting the services read, with placeholder values
+```
 
 ## First-time setup
 
-You need **Node 20.12+** and **JDK 17+** (e.g. `winget install EclipseAdoptium.Temurin.17.JDK`,
-or `brew install --cask temurin@17`), with `JAVA_HOME` pointing at it.
+### Prerequisites
 
-### 1. Create the Supabase project (free tier)
+- **Node.js 20.12+**
+- **JDK 17+**, with `JAVA_HOME` pointing at it (for example
+  `winget install EclipseAdoptium.Temurin.17.JDK` or
+  `brew install --cask temurin@17`). You don't need to install Maven: each
+  Spring service ships with its own wrapper.
+- A free **Supabase** project (Singapore region)
 
-1. At supabase.com, create a project. Region: *Southeast Asia (Singapore)*. Save the database password.
-2. **API keys** (Project Settings → API Keys): copy the **publishable** key and the
-   **secret** key. The legacy `anon` / `service_role` keys work too.
-3. **JWT signing keys** (Project Settings → JWT Keys): new projects sign tokens with
-   an asymmetric key, which is what we want. If yours says *Legacy JWT secret*,
-   either click **Migrate JWT secret** then **Rotate keys**, or put the legacy
-   secret in `SUPABASE_JWT_SECRET`.
-4. **Database connection** (Connect button → *Session pooler*): note the host
-   (`aws-0-<region>.pooler.supabase.com`), port 5432 and user (`postgres.<project-ref>`).
-   Use the session pooler: the direct connection is IPv6-only on the free tier.
-5. Nothing else. Each service creates its own schema and tables on first start
-   (Flyway for the Spring services, `demo/server/db/migrate.js` for the engine).
-
-### 2. Configure and install
+### 1. Install
 
 ```bash
-cp .env.example .env      # then fill in the Supabase values
-npm install               # installs the root scripts' deps and demo/
+git clone https://github.com/justins-github/MakanMatch-CS203.git
+cd MakanMatch-CS203
+npm install
 ```
 
-### 3. Run everything
+`npm install` also installs the web app and engine dependencies in `demo/`.
+
+### 2. Configure
+
+```bash
+cp .env.example .env
+```
+
+Fill in the Supabase URL, the API keys and the database connection. The comments
+in [`.env.example`](.env.example) say where to find each value in the Supabase
+dashboard. Use the **session pooler** connection, because the direct connection
+is IPv6-only on the free tier. You don't need to create any tables: each service
+creates its own schema on first start.
+
+`.env` is gitignored. Never commit it.
+
+### 3. Run
 
 ```bash
 npm run dev
 ```
 
-This starts account-service, catalog-service, the engine and the web app together.
-The first start downloads Maven and the Spring dependencies (a few minutes).
-The Spring services log quietly here (warnings, errors and a "Tomcat started" line);
-`npm run dev:verbose` gives Maven's and Spring's full startup output.
-Open http://localhost:5203. Swagger UI: http://localhost:8082/swagger-ui.html
-(accounts) and http://localhost:8083/swagger-ui.html (catalog).
+This starts account-service, catalog-service, the engine and the web app in one
+terminal. The first start downloads Maven and the Spring dependencies, which takes
+a few minutes.
 
-### 4. Load data (once, with `npm run dev` running)
+| What | Where |
+|---|---|
+| Web app | http://localhost:5203 |
+| account-service API docs | http://localhost:8082/swagger-ui.html |
+| catalog-service API docs | http://localhost:8083/swagger-ui.html |
+| Engine health check | http://localhost:3001/api/health |
+
+### 4. Load the venue data (once)
+
+In a second terminal, with `npm run dev` still running:
 
 ```bash
-npm run load:venues       # 21.7k venues into the catalog (re-run monthly after extract-overture)
-npm run seed:menus        # the curated demo dishes and prices
-npm run upload:vectors    # optional: venue vectors into pgvector (build them first: node scripts/embed-venues.mjs)
+npm run load:venues
+npm run seed:menus
+```
+
+Optionally, build the venue taste vectors. This takes about 2 minutes plus a
+one-time ~23 MB model download. Without them, ranking simply skips the similarity
+term.
+
+```bash
+node scripts/embed-venues.mjs
+npm run upload:vectors
 ```
 
 ### 5. Make yourself an admin
 
-Sign up in the app, then:
+Sign up in the app, then run:
 
 ```bash
 node scripts/seed-accounts.mjs --promote you@example.com
 ```
 
-Refresh, and the **Admin** tab and the **View as** switcher appear. After that,
-admins promote each other in the Admin tab. For testing the owner screens:
-`node scripts/seed-accounts.mjs --grant you@example.com turks-kebab`.
+Refresh, and the **Admin** tab appears. From then on, admins promote each other
+in the app.
 
-## The demo community (Week 13)
+### Optional: the demo community
 
-```bash
-npm run seed:personas     # 4 diners with distinct tastes, 2 owners, 1 pending claim
-npm run simulate          # a week of activity through the real APIs
-```
-
-`seed:personas` needs `SEED_PERSONA_PASSWORD` in `.env`. Personas sign in with
-their username, e.g. `mei_chilli`. The simulation has Ahmet report that Turk's
-Kebab moved to Parklane and set an official price, Thura close Yangon Flavours for
-renovation, the diners review dishes according to their tastes, and two diners pay
-more than the menu says. Afterwards:
-- the diners' Taste DNA and feeds differ from each other;
-- Yangon Flavours drops out of feeds (the feed says why);
-- Turk's Kebab shows its new address;
-- Ahmet sees a price conflict to resolve;
-- an admin has Siti's claim to review.
-
-`npm run simulate -- --fresh` resets the diners first.
-
-## Roles
-
-| | Diner | Owner | Admin |
-|---|---|---|---|
-| For you, Review, Taste DNA, Profile | ✓ | ✓ | ✓ |
-| Claim a venue (proof required) | ✓ | ✓ | ✓ |
-| **My venues**: post status, edit menu and official prices, resolve price conflicts |  | own venues only | own venues only |
-| **Admin**: approve/reject claims, promote/demote admins, disable accounts, revoke ownership |  |  | ✓ |
-| Review your own venue | - | ✗ | ✗ |
-
-"Owner" isn't stored: an account is an owner when it manages at least one venue.
-Admins can **view as** User or Owner. The server then applies exactly that role's
-permissions, so it's a real test, and a caution strip reminds you.
-
-## Security design (for the report)
-
-- **Passwords never touch our code or database.** Supabase Auth hashes and checks them.
-- **Tokens:** the access token (~1 h) lives only in page memory. The refresh token
-  lives only in an `HttpOnly; SameSite=Strict; Path=/api/auth` cookie (`Secure` over
-  https), so injected scripts can't read either. Refresh tokens rotate on every use.
-- **Verification:** every service checks the access token itself: the ES256
-  signature against Supabase's published keys, plus expiry, issuer and audience.
-  Roles come from our database on each request, so promoting, demoting or disabling
-  takes effect immediately in account-service, and within 30 s in the other services
-  (they cache account lookups).
-- **Forgery:** bearer tokens can't be sent by another site. The two cookie routes
-  also require an `X-Requested-With` header, which cross-site requests can't add.
-- **Login throttling** per client and identifier (10 tries per 5 minutes). Login
-  failures give one generic message whether or not the account exists.
-- **Least exposure:** our tables live in `accounts`, `catalog` and `taste`. These
-  schemas aren't exposed through Supabase's public Data API, and Row Level Security
-  with no policies blocks it anyway.
-- **Guard rails:** an admin can't approve their own claim, can't change their own
-  admin/disabled status, and the last active admin can't be removed. Owners can't
-  review their own venue. Disabling an account also bans it in Supabase.
-
-## Tests
+Set `SEED_PERSONA_PASSWORD` in `.env`, then run:
 
 ```bash
-npm test                                  # engine: 94 tests, incl. SQL against embedded Postgres + pgvector
-cd account-service && ./mvnw test         # 44 tests (web layer, rules, architecture)
-cd catalog-service && ./mvnw test         # 28 tests
+npm run seed:personas
 ```
 
-Each Spring service also has a full-boot test (Flyway + schema validation against
-a real database). It runs only when the `DB_*` and `SUPABASE_*` environment variables
-are set, e.g. for a second Supabase project used for testing.
+```bash
+npm run simulate
+```
 
-## Free-tier notes
+The first command creates four diners with distinct tastes, two owners and a
+pending claim. The second plays a week of activity through the real APIs:
+reviews, an owner reporting that their venue moved, a temporary closure and a
+disputed price. Personas sign in with their username (for example `mei_chilli`).
+Run `npm run simulate -- --fresh` to reset the diners first.
 
-- Free Supabase projects **pause after 7 days without activity**. Open the app (or
-  the dashboard) before a demo.
-- The session pooler allows few connections. Each service uses `DB_POOL_SIZE=3`.
-- Supabase's built-in mailer only reaches your own team's addresses (2 emails an
-  hour), so sign-up doesn't send confirmation emails, and password resets are done
-  by an admin from the Supabase dashboard.
-- **Deploying:** serve the web app and all three APIs from **one origin** (e.g.
-  Vercel rewrites `/api/...` to the services) so the refresh cookie works, and set
-  `COOKIE_SECURE=true`.
+### Optional: context-service
+
+`npm run dev` doesn't start context-service yet. You need a free
+[OneMap](https://www.onemap.gov.sg/apidocs/) account. Set `ONEMAP_EMAIL` and
+`ONEMAP_PASSWORD` in your shell's environment (this service doesn't read `.env`),
+then run:
+
+```bash
+cd context-service
+./mvnw spring-boot:run
+```
+
+On Windows, use `mvnw.cmd` in place of `./mvnw`. The service listens on port 8081,
+with API docs at http://localhost:8081/swagger-ui/index.html. Its
+[README](context-service/README.md) covers its endpoints and settings.
+
+## Running the tests
+
+```bash
+npm test
+```
+
+```bash
+cd account-service && ./mvnw test
+```
+
+```bash
+cd catalog-service && ./mvnw test
+```
+
+```bash
+cd context-service && ./mvnw test
+```
+
+- `npm test` runs the engine tests, including its SQL, against an embedded
+  Postgres with pgvector (PGlite). It doesn't need Supabase.
+- account-service and catalog-service each include a full-boot test (Flyway
+  migrations plus schema validation). It runs only when `DB_HOST` and the other
+  `DB_*` and `SUPABASE_*` variables are set, ideally for a separate test project.
+- context-service's `OneMapClientIntegrationTest` calls the live OneMap API, so it
+  needs network access and OneMap credentials.
+
+## Useful commands
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | Start all four processes with quiet logs |
+| `npm run dev:verbose` | The same, with Maven's and Spring's full startup output |
+| `npm test` | Run the engine tests |
+| `npm run load:venues` | Load or refresh the venue registry in the catalog. Owner reports are kept |
+| `npm run seed:menus` | Add the curated demo dishes and prices |
+| `npm run upload:vectors` | Upload venue embeddings to pgvector |
+| `npm run seed:personas` / `npm run simulate` | Create the demo community and play a week of activity |
+| `node scripts/extract-overture.mjs` | Re-extract Singapore venues from the latest monthly Overture Maps release, then run `load:venues` |
+| `node scripts/embed-venues.mjs` | Rebuild the venue embeddings |
+| `node scripts/seed-accounts.mjs --promote <email>` | Make an account an admin |
+| `node scripts/seed-accounts.mjs --grant <email> <venueId>` | Let an account manage a venue without a claim (handy for testing) |
 
 ## Troubleshooting
 
-- **"Port 8082 (or 8083) already in use"** after stopping the services: on Windows a
-  Spring service's `java.exe` can outlive its terminal. Find it with
-  `netstat -ano | findstr :8082` and end that PID in Task Manager.
-- **Everything returns 401**: check `SUPABASE_URL` in `.env`. Tokens are only
-  accepted from that exact project.
-- **Engine won't start: "SUPABASE_URL is not set"**: `.env` must be at the repo root.
+- **"Port 8082 (or 8083) already in use"**: on Windows, a Spring service's
+  `java.exe` can outlive its terminal. Find it with `netstat -ano | findstr :8082`
+  and end that PID in Task Manager.
+- **Every request returns 401**: check `SUPABASE_URL` in `.env`. The services only
+  accept tokens from that exact project.
+- **The engine won't start: "SUPABASE_URL is not set"**: `.env` must be at the
+  repository root.
+- **The database was fine yesterday but won't connect today**: free Supabase
+  projects pause after 7 days of inactivity. Open the dashboard to wake it.
 
-## Known limitations
+## Project status
 
-- No self-service password reset (see the mailer note above).
-- Login throttling is in memory: per instance, reset on restart.
-- The engine's TLS connection to Postgres is encrypted, but it doesn't pin
-  Supabase's certificate.
-- `context-service/` (weather and OneMap) isn't wired in yet; the engine reads the
-  data.gov.sg forecast itself.
+Everything under [What it does](#what-it-does) works end to end. Still to come:
+
+- **context-service isn't wired in yet.** For now the engine reads the
+  data.gov.sg forecast itself. Next, the engine will use context-service for
+  OneMap walking times and rain-adjusted ranking.
+- **Menu-photo reading is a proof of concept.** Uploads are validated, but the
+  dishes come from a sample reader behind a `MenuReader` interface until a
+  vision-model reader is added.
+- **Dietary needs are recorded but don't affect ranking yet.**
+- **No self-service password reset.** Supabase's free-tier mailer only reaches the
+  team's own addresses, so an admin resets passwords from the Supabase dashboard.
+- **Login throttling is kept in memory**, so each instance counts on its own and
+  the counts reset on restart.
+
+## Contributing
+
+- Branch from `main`, one feature per branch, and name it after its Jira issue
+  where there is one.
+- Commit messages follow Conventional Commits. See
+  [`.github/commit-instructions.md`](.github/commit-instructions.md).
+- Run the tests for everything you touched before opening a pull request. A
+  teammate reviews every PR before it merges.
+- Keep secrets out of git: real values belong in `.env` only, and `.env.example`
+  holds placeholders.
+
+## Data sources
+
+- [Overture Maps Foundation](https://overturemaps.org/): the Singapore places
+  that seed the venue registry
+- [data.gov.sg](https://data.gov.sg/): NEA's two-hour weather forecast
+- [OneMap](https://www.onemap.gov.sg/) by the Singapore Land Authority: walking
+  routes
+- [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors: map tiles
+- [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2),
+  run locally with transformers.js: venue embeddings

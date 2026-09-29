@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { claimVenue } from '../../api/accountApi.js'
 import { searchCatalogVenues } from '../../api/catalogApi.js'
+import { Unsaved } from '../Accordion.jsx'
 
 const MIN_PROOF = 10
 
@@ -109,6 +110,7 @@ export default function ClaimVenue({ onClaimed, onCancel }) {
           Cancel
         </button>
       </div>
+      <Unsaved when={venue !== null || proof.trim() !== ''} />
     </form>
   )
 }

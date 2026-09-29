@@ -45,12 +45,12 @@ export default function RoleSwitcher() {
   )
 }
 
-// Caution tape across the header while an admin is acting as someone else.
+// A coloured strip under the header while an admin is acting as someone else.
 export function ActingAsTape() {
   const { me, actAs } = useAuth()
   if (!me?.admin || !actAs) return null
   return (
-    <div className="acting-tape" role="status">
+    <div className={`acting-tape as-${actAs}`} role="status">
       <span>
         Acting as {actAs === 'owner' ? 'an owner' : 'a user'}: the server treats you exactly like one
       </span>
