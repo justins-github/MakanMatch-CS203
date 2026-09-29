@@ -14,8 +14,10 @@ import { errorHandler } from './errors.js'
 import { starterProfile } from './learn.js'
 import { createTokenVerifier, requireAuth } from './middleware/requireAuth.js'
 import { loadRegistry } from './registry.js'
+import { openApiSpec } from './openapi.js'
 import { venueEmbeddingRepository } from './repositories/venueEmbeddingRepository.js'
 import { contextRoutes } from './routes/context.js'
+import { docsRoutes } from './routes/docs.js'
 import { profileRoutes } from './routes/profile.js'
 import { recommendationRoutes } from './routes/recommendations.js'
 import { reviewRoutes } from './routes/reviews.js'
@@ -66,6 +68,7 @@ const app = express()
 app.disable('x-powered-by')
 app.use(express.json({ limit: '32kb' }))
 app.use(contextRoutes({ getContext })) // public
+app.use(docsRoutes({ spec: openApiSpec })) // public
 app.use('/api', authenticated) // everything below needs a signed-in user
 app.use(recommendationRoutes({ recommendations, getContext }))
 app.use(venueRoutes({ recommendations }))

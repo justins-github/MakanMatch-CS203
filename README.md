@@ -242,6 +242,7 @@ a few minutes.
 | Web app | http://localhost:5203 |
 | account-service API docs | http://localhost:8082/swagger-ui.html |
 | catalog-service API docs | http://localhost:8083/swagger-ui.html |
+| Engine API docs | http://localhost:3001/swagger-ui.html |
 | Engine health check | http://localhost:3001/api/health |
 
 ### 4. Load the venue data (once)

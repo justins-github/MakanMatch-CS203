@@ -3,7 +3,7 @@ import { Router } from 'express'
 import { asyncHandler } from '../errors.js'
 import { withRainOverride } from '../weather.js'
 
-const MOODS = ['none', 'soupy', 'spicy', 'light']
+export const MOODS = ['none', 'soupy', 'spicy', 'light']
 
 export function recommendationRoutes({ recommendations, getContext }) {
   const router = Router()
