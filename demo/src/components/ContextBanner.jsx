@@ -1,4 +1,4 @@
-export default function ContextBanner({ context, simRain, onToggleRain }) {
+export default function ContextBanner({ context, simRain, canSimulate, onToggleRain }) {
   if (!context) return null
 
   const sourceLabel =
@@ -18,9 +18,11 @@ export default function ContextBanner({ context, simRain, onToggleRain }) {
         </div>
         <div className="detail">{sourceLabel}</div>
       </div>
-      <button className="banner-toggle" onClick={onToggleRain}>
-        {simRain ? 'Stop rain sim' : 'Simulate rain'}
-      </button>
+      {canSimulate && (
+        <button className="banner-toggle" onClick={onToggleRain}>
+          {simRain ? 'Stop rain sim' : 'Simulate rain'}
+        </button>
+      )}
     </div>
   )
 }

@@ -4,7 +4,6 @@ import { useAuth } from './auth/AuthContext.jsx'
 import ContextBanner from './components/ContextBanner.jsx'
 import Feed from './components/Feed.jsx'
 import Login from './components/Login.jsx'
-import MoodBar from './components/MoodBar.jsx'
 import Review from './components/Review.jsx'
 import TasteDna from './components/TasteDna.jsx'
 import Profile from './components/account/Profile.jsx'
@@ -71,6 +70,9 @@ function SignedInApp() {
   const tabs = tabsFor(role)
   // Switching to a smaller role can take away the tab you were on.
   const activeTab = tabs.some(([id]) => id === tab) ? tab : 'feed'
+  // Rain simulation is an admin tool; viewing as a user or owner switches it off.
+  const canSimulateRain = role === 'ADMIN'
+  if (simRain && !canSimulateRain) setSimRain(false)
 
   // Idle landing still shows the live weather banner.
   useEffect(() => {
@@ -168,6 +170,7 @@ function SignedInApp() {
           <ContextBanner
             context={context}
             simRain={simRain}
+            canSimulate={canSimulateRain}
             onToggleRain={() => setSimRain((v) => !v)}
           />
           {error ? (
@@ -182,7 +185,8 @@ function SignedInApp() {
               onBack={backToLanding}
             />
           )}
-          <MoodBar mood={mood} onMood={setMood} />
+          {/* Mood buttons (MoodBar.jsx) are off for now; the bar keeps its space for what goes here next. */}
+          <div className="moodbar" />
         </>
       )}
 

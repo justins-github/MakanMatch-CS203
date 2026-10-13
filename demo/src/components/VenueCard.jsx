@@ -43,7 +43,11 @@ export default function VenueCard({ venue, index }) {
       <div className="meta">
         {fullAddress}
       </div>
-      {venue.hours && <div className="hours-line">{venue.hours.label}</div>}
+      {venue.hours ? (
+        <div className="hours-line">{venue.hours.label}</div>
+      ) : (
+        <div className="hours-line unknown">Hours unknown · check before you go</div>
+      )}
       <OwnerUpdate update={venue.ownerUpdate} />
       <div className="chips">
         {venue.why.map((reason, i) => (
