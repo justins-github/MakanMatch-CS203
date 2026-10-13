@@ -79,71 +79,149 @@
   gap: 10px;
 }
 
+.hours-week {
+  display: flex;
+  flex-direction: column;
+}
+
+/* One line per day: name, switch, times, ⋯. A second session and the menu go on lines below. */
 .hours-day {
   display: grid;
-  grid-template-columns: 38px 1fr;
-  gap: 6px 8px;
+  grid-template-columns: 30px 34px minmax(0, 1fr) 20px;
+  gap: 6px;
   align-items: center;
-  border-top: 1.5px dashed var(--ink-soft);
-  padding-top: 8px;
+  padding: 7px 0;
+  border-top: 1px solid var(--paper-dim);
+}
+
+.hours-day:first-child {
+  border-top: none;
 }
 
 .hours-day-name {
+  grid-column: 1;
   font-family: var(--font-data);
   font-size: 12px;
   font-weight: 600;
 }
 
-.hours-mode {
-  display: flex;
-  gap: 6px;
-}
-
-.hours-mode-btn {
-  appearance: none;
-  flex: 1;
-  border: var(--line);
-  border-radius: 8px;
-  background: var(--paper);
-  font-family: var(--font-body);
-  font-weight: 600;
-  font-size: 12.5px;
-  padding: 6px 4px;
-  cursor: pointer;
-  box-shadow: 2px 2px 0 var(--ink);
-}
-
-.hours-mode-btn[aria-checked='true'] {
-  box-shadow: none;
-  transform: translate(2px, 2px);
-}
-
-.hours-mode-btn.closed[aria-checked='true'] { background: var(--paper-dim); color: var(--ink-soft); }
-.hours-mode-btn.open[aria-checked='true'],
-.hours-mode-btn.allday[aria-checked='true'] { background: var(--pandan); color: var(--paper); }
-
-.hours-sessions {
+.hours-switch {
   grid-column: 2;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  appearance: none;
+  position: relative;
+  width: 34px;
+  height: 20px;
+  padding: 0;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper-dim);
+  cursor: pointer;
+}
+
+.hours-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--ink-soft);
+  transition: left 0.15s ease;
+}
+
+.hours-switch[aria-checked='true'] { background: var(--pandan); }
+.hours-switch[aria-checked='true']::after { left: 16px; background: var(--paper); }
+
+.hours-session,
+.hours-off,
+.hours-allday {
+  grid-column: 3;
 }
 
 .hours-session {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   flex-wrap: wrap;
 }
 
-.hours-session input {
-  border: var(--line);
+.hours-off,
+.hours-allday {
+  font-family: var(--font-data);
+  font-size: 12px;
+}
+
+.hours-off { color: var(--ink-soft); }
+.hours-allday { color: var(--pandan); font-weight: 600; }
+
+/* Times come from a quarter-hour list; the arrow is drawn so every browser shows the same pill. */
+.hours-time {
+  appearance: none;
+  border: 1.5px solid var(--ink);
   border-radius: 8px;
-  background: var(--paper);
+  background: var(--paper) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236b6257' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 6px center / 8px 5px;
   color: var(--ink);
   font-family: var(--font-data);
+  font-size: 12px;
+  padding: 4px 18px 4px 6px;
+  cursor: pointer;
+}
+
+.hours-more {
+  grid-column: 4;
+  appearance: none;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1;
+  padding: 3px 0 5px;
+  cursor: pointer;
+}
+
+.hours-more[aria-expanded='true'] {
+  background: var(--paper-dim);
+  color: var(--ink);
+}
+
+.hours-day .hours-remove {
+  grid-column: 4;
+}
+
+.hours-menu {
+  grid-column: 3 / -1;
+  display: flex;
+  flex-direction: column;
+  border: 1.5px solid var(--ink);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: 2px 2px 0 var(--ink);
+  overflow: hidden;
+}
+
+.hours-menu button {
+  appearance: none;
+  border: none;
+  border-top: 1px solid var(--paper-dim);
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-body);
   font-size: 13px;
-  padding: 5px 6px;
+  text-align: left;
+  padding: 8px 11px;
+  cursor: pointer;
+}
+
+.hours-menu button:first-child {
+  border-top: none;
+}
+
+@media (hover: hover) {
+  .hours-menu button:hover {
+    background: var(--paper-dim);
+  }
 }
 
 .hours-hint {
@@ -174,12 +252,19 @@
   text-decoration: underline;
 }
 
-.hours-mode-btn:focus-visible,
-.hours-session input:focus-visible,
+.hours-switch:focus-visible,
+.hours-time:focus-visible,
+.hours-more:focus-visible,
+.hours-menu button:focus-visible,
 .hours-remove:focus-visible,
 .hours-add:focus-visible {
   outline: 3px solid var(--monsoon);
   outline-offset: 2px;
+}
+
+/* The menu clips its corners, so its ring sits inside. */
+.hours-menu button:focus-visible {
+  outline-offset: -3px;
 }
 
 .menu-price {
@@ -372,8 +457,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .status-choice[aria-checked='true'],
-  .hours-mode-btn[aria-checked='true'] {
+  .status-choice[aria-checked='true'] {
     transform: none;
+  }
+
+  .hours-switch::after {
+    transition: none;
   }
 }
