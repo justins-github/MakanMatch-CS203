@@ -21,4 +21,9 @@ public class RestClientConfig {
     RestClient neaRestClient(NeaProperties props) {
         return RestClient.builder().baseUrl(props.baseUrl()).build();
     }
+
+    @Bean
+    RestClient catalogRestClient(CatalogServiceProperties props) {
+        return RestClient.builder().baseUrl(props.baseUrl()).build();
+    }
 }

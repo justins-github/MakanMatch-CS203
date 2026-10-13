@@ -21,7 +21,13 @@ public class CacheConfig {
                 new CaffeineCache("walkRoutes", Caffeine.newBuilder()
                         .expireAfterWrite(Duration.ofMinutes(10)).build()),
                 new CaffeineCache("weather", Caffeine.newBuilder()
-                        .expireAfterWrite(Duration.ofMinutes(5)).build())
+                        .expireAfterWrite(Duration.ofMinutes(5)).build()),
+                new CaffeineCache("catalogVenueStatuses", Caffeine.newBuilder()
+                        .expireAfterWrite(Duration.ofMinutes(5)).build()),
+                new CaffeineCache("catalogVenueHours", Caffeine.newBuilder()
+                        .expireAfterWrite(Duration.ofMinutes(5)).build()),
+                new CaffeineCache("catalogPrices", Caffeine.newBuilder()
+                        .expireAfterWrite(Duration.ofMinutes(10)).build())
         ));
         return manager;
     }

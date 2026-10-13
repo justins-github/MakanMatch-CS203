@@ -27,3 +27,17 @@ curl 'http://localhost:8081/api/context/weather?lat=1.3521&lng=103.8198'
 ```
 
 Nearby results are then ranked by a configurable weather-based score. The score combines walk time with rain-only shelter and comfort bonuses; it is rule-based and independent from taste-profile data. `ranking.*` contains the category weights, bonuses, and sheltered/comfortable place-ID lists. Results include `weatherScore` and human-readable `reasons`. When weather is unavailable, ranking uses the NONE weight, applies no bonuses, and adds `Weather data unavailable`.
+
+## Catalog service client and providers
+
+The catalog integration uses HTTP only. Set `CATALOG_SERVICE_BASE_URL` (default `http://localhost:8083`).
+`CatalogPlaceProvider` reads from an in-memory venue cache refreshed on startup and every 15 minutes;
+`CatalogPriceProvider` requests dish-level prices only for a venue that a later feature has already shortlisted.
+Venue status and opening-hours responses are cached for five minutes, and dish responses are cached per venue
+for ten minutes. Catalog connection failures retain the last good venue cache (or an empty cache on first
+startup) and are reported at `GET /debug/catalog-cache`.
+
+Known limitation: the current catalog-service search endpoint requires a text `q` and caps each response at
+25 rows; it has no page/offset or bulk-all-venues endpoint. The cache therefore uses the bootstrap query `an`
+and cannot guarantee the complete venue registry. The health response exposes this cache as query-scoped until
+catalog-service provides a bulk endpoint.
