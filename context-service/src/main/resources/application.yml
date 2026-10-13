@@ -28,3 +28,7 @@ ranking:
   comfort-bonus: ${RANKING_COMFORT_BONUS:0.10}
   sheltered-place-ids: ${RANKING_SHELTERED_PLACE_IDS:sg-001,sg-002,sg-003,sg-004,sg-007,sg-013,sg-022,sg-023,sg-025,sg-030}
   comfort-place-ids: ${RANKING_COMFORT_PLACE_IDS:sg-001,sg-002,sg-003,sg-004,sg-007,sg-013,sg-022,sg-023,sg-025,sg-030}
+
+catalog:
+  base-url: ${CATALOG_SERVICE_URL:http://localhost:8083}
+  refresh-ms: ${CATALOG_SERVICE_REFRESH_MS:900000}
