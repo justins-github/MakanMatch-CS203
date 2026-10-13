@@ -379,6 +379,11 @@ body {
   border-top: var(--line);
 }
 
+/* No buttons in it for now: keep the height it had with them, so the layout doesn't shift. */
+.moodbar:empty {
+  height: 84px;
+}
+
 .chip {
   flex: 1;
   appearance: none;
@@ -1265,6 +1270,15 @@ body {
   border-radius: 50%;
   background: var(--pandan);
   vertical-align: 1px;
+}
+
+/* No owner hours (most Overture venues): we can't vouch that it's open. */
+.hours-line.unknown {
+  color: var(--ink-soft);
+}
+
+.hours-line.unknown::before {
+  background: var(--ink-soft);
 }
 
 .owner-update-label {
