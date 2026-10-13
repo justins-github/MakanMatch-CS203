@@ -57,7 +57,7 @@ function DeltaPanel({ result }) {
     <div className="delta-panel">
       <div className="delta-title">The AI just learned</div>
       <div className="delta-predict">
-        It predicted {prediction.predictedScore10}/10 - your ranking placed it {result.score10}/10
+        Your ranking placed it {result.score10}/10 - the AI had predicted {prediction.predictedScore10}/10
       </div>
       {deltas.length === 0 && (
         <div className="delta-row">No profile change - this review matched what it already knew.</div>
@@ -276,7 +276,6 @@ export default function Review() {
   // Same-named chain outlets get their location appended.
   const nameCounts = results.reduce((m, r) => m.set(r.name, (m.get(r.name) ?? 0) + 1), new Map())
   const currentOpponent = duel ? duel.opponents[Math.floor((duel.lo + duel.hi) / 2)] : null
-  const selectedDishData = dish ? venueDishes?.find((d) => d.id === dish.id) ?? dish : null
 
   return (
     <main className="rate">
@@ -377,7 +376,6 @@ export default function Review() {
                   </span>
                 </span>
                 <span className="venue-row-scores">
-                  <span className="pill ai">AI {d.predictedScore10}</span>
                   {d.rated && <span className="pill you">You {d.rated.score10}</span>}
                 </span>
               </button>
@@ -423,11 +421,8 @@ export default function Review() {
             ← {venue.name}
           </button>
           <h2 className="step-title">{dish.name}</h2>
-          {selectedDishData?.predictedScore10 != null && (
-            <div className="rate-intro">
-              The AI predicts you'd score this {selectedDishData.predictedScore10}/10. How was it?
-            </div>
-          )}
+          {/* The AI's guess stays hidden until the review is posted, so it can't sway the rating. */}
+          <div className="rate-intro">How was it? You go first - the AI shows its prediction after you post.</div>
           <div className="sentiments">
             {SENTIMENTS.map((s) => (
               <button key={s.id} className={`sentiment ${s.cls}`} onClick={() => pickSentiment(s.id)}>
