@@ -67,6 +67,94 @@ function RadarChart({ dimensions }) {
   )
 }
 
+const HISTORY_COLORS = ['#d6342c', '#237a57', '#46689b', '#b56a16', '#83549a', '#201b15']
+
+function HistoryChart({ history }) {
+  const width = 360
+  const height = 166
+  const left = 34
+  const right = 348
+  const top = 12
+  const bottom = 122
+  const firstTime = Date.parse(history[0].recordedAt)
+  const lastTime = Date.parse(history.at(-1).recordedAt)
+  const timeSpan = lastTime - firstTime
+  const xFor = (snapshot) =>
+    timeSpan === 0 ? (left + right) / 2 : left + ((Date.parse(snapshot.recordedAt) - firstTime) / timeSpan) * (right - left)
+  const yFor = (value) => bottom - value * (bottom - top)
+  const dimensions = history[0].dimensions
+  const formatDate = (value) =>
+    new Date(value).toLocaleDateString('en-SG', { day: 'numeric', month: 'short' })
+
+  return (
+    <div>
+      <svg
+        className="history-chart"
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label={`Taste DNA dimension history from ${formatDate(history[0].recordedAt)} to ${formatDate(history.at(-1).recordedAt)}`}
+      >
+        {[0, 0.5, 1].map((value) => (
+          <g key={value}>
+            <line x1={left} y1={yFor(value)} x2={right} y2={yFor(value)} className="history-grid" />
+            <text x={left - 7} y={yFor(value) + 3} textAnchor="end" className="history-axis-label">
+              {value.toFixed(1)}
+            </text>
+          </g>
+        ))}
+        {dimensions.map((dimension, dimensionIndex) => {
+          const points = history.map((snapshot) => {
+            const value = snapshot.dimensions.find((item) => item.key === dimension.key)?.value ?? 0
+            return `${xFor(snapshot)},${yFor(value)}`
+          })
+          return (
+            <g key={dimension.key}>
+              {history.length > 1 && (
+                <polyline
+                  points={points.join(' ')}
+                  fill="none"
+                  stroke={HISTORY_COLORS[dimensionIndex % HISTORY_COLORS.length]}
+                  strokeWidth="2"
+                />
+              )}
+              {history.map((snapshot) => {
+                const value = snapshot.dimensions.find((item) => item.key === dimension.key)?.value ?? 0
+                return (
+                  <circle
+                    key={`${dimension.key}-${snapshot.recordedAt}`}
+                    cx={xFor(snapshot)}
+                    cy={yFor(value)}
+                    r="3"
+                    fill={HISTORY_COLORS[dimensionIndex % HISTORY_COLORS.length]}
+                  >
+                    <title>{`${dimension.label}: ${value.toFixed(2)} on ${formatDate(snapshot.recordedAt)}`}</title>
+                  </circle>
+                )
+              })}
+            </g>
+          )
+        })}
+        <text x={left} y={height - 8} textAnchor="start" className="history-axis-label">
+          {formatDate(history[0].recordedAt)}
+        </text>
+        {history.length > 1 && (
+          <text x={right} y={height - 8} textAnchor="end" className="history-axis-label">
+            {formatDate(history.at(-1).recordedAt)}
+          </text>
+        )}
+      </svg>
+      <div className="history-legend">
+        {dimensions.map((dimension, index) => (
+          <span key={dimension.key}>
+            <i style={{ backgroundColor: HISTORY_COLORS[index % HISTORY_COLORS.length] }} />
+            {dimension.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function TasteDna() {
   const [profile, setProfile] = useState(null)
   const [error, setError] = useState(null)
@@ -91,6 +179,16 @@ export default function TasteDna() {
       <div className="radar-wrap">
         <RadarChart dimensions={profile.dimensions} />
       </div>
+
+      <section className="dna-history" aria-labelledby="dna-history-title">
+        <h3 id="dna-history-title">How it's changed</h3>
+        <p className="history-note">Your latest learned profile for each day, up to 30 days.</p>
+        {profile.history.length > 0 ? (
+          <HistoryChart history={profile.history} />
+        ) : (
+          <p className="history-empty">Your history will appear here after your next dish rating.</p>
+        )}
+      </section>
 
       <h3>Cuisines you rate</h3>
       {cuisines.map(([cuisine, value]) => (

@@ -6,6 +6,7 @@ import { migrate } from '../db/migrate.js'
 import { openDatabase } from '../db/pool.js'
 import { rankingRepository } from './rankingRepository.js'
 import { reviewRepository } from './reviewRepository.js'
+import { tasteProfileHistoryRepository } from './tasteProfileHistoryRepository.js'
 import { tasteProfileRepository } from './tasteProfileRepository.js'
 import { venueEmbeddingRepository } from './venueEmbeddingRepository.js'
 
@@ -29,6 +30,7 @@ test('migrations apply once and are recorded', async () => {
     '002_create_rankings.sql',
     '003_create_taste_profiles.sql',
     '004_create_venue_embeddings.sql',
+    '005_create_taste_profile_history.sql',
   ])
   assert.deepEqual(await migrate(db), [])
 })
@@ -69,6 +71,26 @@ test('taste profiles upsert, and the learned vector is stored with pgvector', as
   const back = await profiles.getVector(USER)
   assert.equal(back.length, 384)
   assert.ok(Math.abs(back[3] - 1) < 1e-5)
+})
+
+test('taste profile history stores one latest snapshot per user per day', async () => {
+  const history = tasteProfileHistoryRepository(db)
+  await history.deleteForUser(USER)
+  await history.saveSnapshot(USER, { name: 'Tester', spicePref: 0.5 })
+  await history.saveSnapshot(USER, { name: 'Tester', spicePref: 0.8 })
+  const snapshots = await history.listRecent(USER)
+  assert.equal(snapshots.length, 1)
+  assert.equal(snapshots[0].profile.spicePref, 0.8)
+  await history.deleteForUser(USER)
+
+  const staleAt = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000)
+  await db.query(
+    `insert into taste.taste_profile_history (user_id, snapshot_date, profile, updated_at)
+     values ($1, $2::date, $3::jsonb, $4)`,
+    [USER, staleAt.toISOString().slice(0, 10), JSON.stringify({ spicePref: 0.2 }), staleAt],
+  )
+  assert.deepEqual(await history.listRecent(USER), [])
+  await history.deleteForUser(USER)
 })
 
 test('pgvector ranks venues by cosine similarity to a taste vector', async () => {

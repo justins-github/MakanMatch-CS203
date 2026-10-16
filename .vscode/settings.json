@@ -1,5 +1,6 @@
 {
   "github.copilot.chat.commitMessageGeneration.instructions": [
     { "file": ".github/commit-instructions.md" }
-  ]
+  ],
+  "java.configuration.updateBuildConfiguration": "interactive"
 }

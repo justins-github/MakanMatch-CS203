@@ -53,6 +53,9 @@ for (const [kind, makeStore] of Object.entries(stores)) {
     assert.equal(state.reviews[1].text, 'love the spice')
     assert.equal(state.reviews[1].dishName, 'Dish kebab-2')
     assert.ok(state.profile.spicePref > 0.5, 'loving spicy dishes should raise spice preference')
+    const history = await store.history(ALICE)
+    assert.equal(history.length, 1, 'same-day reviews should update one daily snapshot')
+    assert.equal(history[0].profile.spicePref, state.profile.spicePref)
   })
 
   test(`${kind}: users never see each other's learning`, async () => {
@@ -90,6 +93,7 @@ for (const [kind, makeStore] of Object.entries(stores)) {
     await review(store, BOB, 'kebab-9')
     await store.reset(ALICE)
     assert.deepEqual((await store.read(ALICE, 'Alice')).reviews, [])
+    assert.deepEqual(await store.history(ALICE), [])
     assert.equal((await store.read(BOB, 'Bob')).reviews.length > 0, true)
   })
 }

@@ -60,7 +60,8 @@ a real sign-in screen. `npm test` runs the engine tests (`node --test`).
   upgrade path for the text channel: pgvector embeddings + an LLM.
 - **Taste DNA** - the *live* learned profile: six dimensions (radar) + per-cuisine
   affinities + a satiation note ("recently eaten" cuisines are temporarily penalised).
-  Watch it change as you rate.
+  Its history chart shows the latest profile learned each day, retained for up to 30
+  days. **Reset my taste** clears the history along with reviews and rankings.
 - **Mood chips** - one-tap context ("soupy / spicy / light"); they reward venues the
   community has confirmed fit and leave unmapped venues untouched. (The old Surprise
   mood chip became the Surprise me button.)
