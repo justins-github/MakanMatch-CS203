@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
+
 @RestController
 @RequestMapping("/api/places")
 public class PlacesController {
@@ -33,7 +35,8 @@ public class PlacesController {
             summary = "Find nearby places by walking time",
             description = "Returns catalog venues whose rain-adjusted OneMap walking time is within maxWalkMin. "
                     + "Only the nearest places.max-routed candidates are routed; places beyond that limit "
-                    + "are not checked and cannot appear in the response."
+                    + "are not checked and cannot appear in the response. Unknown prices are excluded when "
+                    + "minPrice or maxPrice is supplied unless includeUnknownPrice=true."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Nearby places, sorted by walking time",
@@ -47,7 +50,13 @@ public class PlacesController {
             @Parameter(description = "Longitude in the Singapore bounding box", example = "103.8198")
             @RequestParam String lng,
             @Parameter(description = "Maximum walking time in minutes (1–60)", example = "20")
-            @RequestParam String maxWalkMin) {
+            @RequestParam String maxWalkMin,
+            @Parameter(description = "Minimum median dish price; unknown-price venues are excluded when set", example = "5.00")
+            @RequestParam(required = false) String minPrice,
+            @Parameter(description = "Maximum median dish price; unknown-price venues are excluded when set", example = "30.00")
+            @RequestParam(required = false) String maxPrice,
+            @Parameter(description = "Include venues without a known price when a price filter is active", example = "false")
+            @RequestParam(defaultValue = "false") boolean includeUnknownPrice) {
         double latitude = parseDouble(lat, "lat");
         double longitude = parseDouble(lng, "lng");
         int walkingMinutes = parseInteger(maxWalkMin, "maxWalkMin");
@@ -61,7 +70,16 @@ public class PlacesController {
         if (walkingMinutes < 1 || walkingMinutes > 60) {
             throw badRequest("maxWalkMin must be between 1 and 60");
         }
-        return placeQueryService.findNearby(latitude, longitude, walkingMinutes);
+        BigDecimal minimum = parsePrice(minPrice, "minPrice");
+        BigDecimal maximum = parsePrice(maxPrice, "maxPrice");
+        if (minimum != null && minimum.signum() < 0 || maximum != null && maximum.signum() < 0) {
+            throw badRequest("price filters must be non-negative");
+        }
+        if (minimum != null && maximum != null && minimum.compareTo(maximum) > 0) {
+            throw badRequest("minPrice must not exceed maxPrice");
+        }
+        return placeQueryService.findNearby(latitude, longitude, walkingMinutes, minimum, maximum,
+                includeUnknownPrice);
     }
 
     private static double parseDouble(String value, String parameterName) {
@@ -81,6 +99,15 @@ public class PlacesController {
             return Integer.parseInt(value);
         } catch (NumberFormatException e) {
             throw badRequest(parameterName + " must be an integer");
+        }
+    }
+
+    private static BigDecimal parsePrice(String value, String parameterName) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return new BigDecimal(value);
+        } catch (NumberFormatException e) {
+            throw badRequest(parameterName + " must be a number");
         }
     }
 

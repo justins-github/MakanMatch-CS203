@@ -8,9 +8,11 @@ import com.makanmatch.context_service.DTO.NearbyPlaceDto;
 import com.makanmatch.context_service.DTO.NearbyResponse;
 import com.makanmatch.context_service.DTO.NearbyWeatherDto;
 import com.makanmatch.context_service.DTO.PlaceDto;
+import com.makanmatch.context_service.DTO.PriceSource;
 import com.makanmatch.context_service.DTO.WeatherContext;
 import com.makanmatch.context_service.exception.OneMapException;
 import com.makanmatch.context_service.provider.PlaceProvider;
+import com.makanmatch.context_service.provider.PriceProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -26,17 +28,22 @@ public class PlaceQueryService {
     private final PlacesProperties placesProperties;
     private final WeatherService weatherService;
     private final RankingService rankingService;
+    private final PriceProvider priceProvider;
+    private final PriceBandService priceBandService;
 
     @Autowired
     public PlaceQueryService(PlaceProvider placeProvider, OneMapClient oneMapClient,
                              OneMapProperties oneMapProperties, PlacesProperties placesProperties,
-                             WeatherService weatherService, RankingService rankingService) {
+                             WeatherService weatherService, RankingService rankingService,
+                             PriceProvider priceProvider, PriceBandService priceBandService) {
         this.placeProvider = placeProvider;
         this.oneMapClient = oneMapClient;
         this.oneMapProperties = oneMapProperties;
         this.placesProperties = placesProperties;
         this.weatherService = weatherService;
         this.rankingService = rankingService;
+        this.priceProvider = priceProvider;
+        this.priceBandService = priceBandService;
     }
 
     public PlaceQueryService(PlaceProvider placeProvider, OneMapClient oneMapClient,
@@ -45,7 +52,18 @@ public class PlaceQueryService {
         this(placeProvider, oneMapClient, oneMapProperties, placesProperties, weatherService,
                 new RankingService(new RankingProperties(
                         new RankingProperties.WalkWeight(0.2, 0.5, 0.7), 0.20, 0.10,
-                        java.util.Set.of(), java.util.Set.of())));
+                        java.util.Set.of(), java.util.Set.of())),
+                venueId -> java.util.List.of(), new PriceBandService(new com.makanmatch.context_service.config.PriceProperties(
+                        java.math.BigDecimal.TEN, java.math.BigDecimal.valueOf(30))));
+    }
+
+    public PlaceQueryService(PlaceProvider placeProvider, OneMapClient oneMapClient,
+                             OneMapProperties oneMapProperties, PlacesProperties placesProperties,
+                             WeatherService weatherService, PriceProvider priceProvider,
+                             PriceBandService priceBandService) {
+        this(placeProvider, oneMapClient, oneMapProperties, placesProperties, weatherService,
+                new RankingService(new RankingProperties(new RankingProperties.WalkWeight(0.2, 0.5, 0.7),
+                        0.20, 0.10, java.util.Set.of(), java.util.Set.of())), priceProvider, priceBandService);
     }
 
     /**
@@ -53,6 +71,12 @@ public class PlaceQueryService {
      * checked against their real walking time and therefore cannot appear in this response.
      */
     public NearbyResponse findNearby(double lat, double lng, int maxWalkMin) {
+        return findNearby(lat, lng, maxWalkMin, null, null, false);
+    }
+
+    public NearbyResponse findNearby(double lat, double lng, int maxWalkMin,
+                                     java.math.BigDecimal minPrice, java.math.BigDecimal maxPrice,
+                                     boolean includeUnknownPrice) {
         WeatherContext weather = weatherService.getContext(lat, lng);
         double effectiveRawLimitMinutes = maxWalkMin / weather.multiplier();
         double radiusMetres = effectiveRawLimitMinutes * oneMapProperties.walkSpeedMPerMin();
@@ -76,8 +100,12 @@ public class PlaceQueryService {
                 double rawWalkMinutes = route.totalTimeSeconds() / 60.0;
                 double adjustedWalkMinutes = rawWalkMinutes * weather.multiplier();
                 if (adjustedWalkMinutes <= maxWalkMin) {
-                    nearby.add(new NearbyPlaceDto(place.id(), place.name(), place.lat(), place.lng(),
-                            rawWalkMinutes, adjustedWalkMinutes));
+                    PriceBandService.PriceSummary price = priceSummary(place.id());
+                    if (priceMatches(price, minPrice, maxPrice, includeUnknownPrice)) {
+                        nearby.add(new NearbyPlaceDto(place.id(), place.name(), place.lat(), place.lng(),
+                                rawWalkMinutes, adjustedWalkMinutes, 0.0, java.util.List.of(),
+                                price.medianPrice(), price.priceBand(), price.priceSource(), price.priceReportCount()));
+                    }
                 }
             } catch (OneMapException e) {
                 partial = true;
@@ -88,6 +116,24 @@ public class PlaceQueryService {
                 weather.multiplier(), weatherService.assumptionText());
         return new NearbyResponse(partial ? "partial" : "complete", nearby, weatherSummary,
                 venueCoverage, venuesSearched);
+    }
+
+    private PriceBandService.PriceSummary priceSummary(String venueId) {
+        try {
+            return priceBandService.summarize(priceProvider.getPrices(venueId));
+        } catch (RuntimeException ignored) {
+            return new PriceBandService.PriceSummary(null, null, PriceSource.UNKNOWN, 0);
+        }
+    }
+
+    private static boolean priceMatches(PriceBandService.PriceSummary price,
+                                        java.math.BigDecimal minPrice, java.math.BigDecimal maxPrice,
+                                        boolean includeUnknownPrice) {
+        boolean filtering = minPrice != null || maxPrice != null;
+        if (!filtering || price.medianPrice() != null &&
+                (minPrice == null || price.medianPrice().compareTo(minPrice) >= 0) &&
+                (maxPrice == null || price.medianPrice().compareTo(maxPrice) <= 0)) return true;
+        return includeUnknownPrice && price.medianPrice() == null;
     }
 
     private record Candidate(PlaceDto place, double distanceMetres) {}
