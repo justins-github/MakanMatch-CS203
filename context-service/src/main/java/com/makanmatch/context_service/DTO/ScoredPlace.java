@@ -10,6 +10,7 @@ public record ScoredPlace(NearbyPlaceDto place, double weatherScore, List<String
 
     public NearbyPlaceDto toNearbyPlace() {
         return new NearbyPlaceDto(place.id(), place.name(), place.lat(), place.lng(),
-                place.rawWalkMinutes(), place.adjustedWalkMinutes(), weatherScore, reasons);
+                place.rawWalkMinutes(), place.adjustedWalkMinutes(), weatherScore, reasons,
+                place.medianPrice(), place.priceBand(), place.priceSource(), place.priceReportCount());
     }
 }
