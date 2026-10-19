@@ -56,7 +56,10 @@ public class PlaceQueryService {
         WeatherContext weather = weatherService.getContext(lat, lng);
         double effectiveRawLimitMinutes = maxWalkMin / weather.multiplier();
         double radiusMetres = effectiveRawLimitMinutes * oneMapProperties.walkSpeedMPerMin();
-        List<PlaceDto> candidates = placeProvider.getPlaces().stream()
+        List<PlaceDto> availablePlaces = placeProvider.getPlaces();
+        int venuesSearched = placeProvider.venuesSearched();
+        String venueCoverage = venuesSearched == 0 ? "unavailable" : placeProvider.venueCoverage();
+        List<PlaceDto> candidates = availablePlaces.stream()
                 .map(place -> new Candidate(place, HaversineCalculator.distanceMetres(
                         lat, lng, place.lat(), place.lng())))
                 .filter(candidate -> candidate.distanceMetres() <= radiusMetres)
@@ -83,7 +86,8 @@ public class PlaceQueryService {
         nearby = new ArrayList<>(rankingService.rank(nearby, weather, maxWalkMin));
         NearbyWeatherDto weatherSummary = new NearbyWeatherDto(weather.status(), weather.forecastText(),
                 weather.multiplier(), weatherService.assumptionText());
-        return new NearbyResponse(partial ? "partial" : "complete", nearby, weatherSummary);
+        return new NearbyResponse(partial ? "partial" : "complete", nearby, weatherSummary,
+                venueCoverage, venuesSearched);
     }
 
     private record Candidate(PlaceDto place, double distanceMetres) {}

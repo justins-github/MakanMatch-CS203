@@ -31,7 +31,7 @@ public class PlacesController {
 
     @Operation(
             summary = "Find nearby places by walking time",
-            description = "Returns fixture places whose rain-adjusted OneMap walking time is within maxWalkMin. "
+            description = "Returns catalog venues whose rain-adjusted OneMap walking time is within maxWalkMin. "
                     + "Only the nearest places.max-routed candidates are routed; places beyond that limit "
                     + "are not checked and cannot appear in the response."
     )

@@ -54,6 +54,14 @@ public class VenueCacheService {
     }
 
     public List<CatalogVenueDto> venues() { return venues; }
+    public int venuesSearched() { return venues.size(); }
+
+    /**
+     * The catalog search endpoint currently returns at most 25 query-scoped venues,
+     * so every non-empty cache is partial until a bulk endpoint is available.
+     */
+    public String venueCoverage() { return venues.isEmpty() ? "unavailable" : "partial"; }
+
     public Instant lastRefreshedAt() { return lastRefreshedAt; }
     public String lastRefreshError() { return lastRefreshError; }
 
