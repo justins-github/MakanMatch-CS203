@@ -1,6 +1,7 @@
 package com.makanmatch.context_service.service;
 
 import com.makanmatch.context_service.DTO.WalkRouteDto;
+import com.makanmatch.context_service.DTO.CatalogVenueDto;
 import com.makanmatch.context_service.config.OneMapProperties;
 import com.makanmatch.context_service.config.PlacesProperties;
 import com.makanmatch.context_service.client.NeaWeatherClient;
@@ -12,6 +13,10 @@ import com.makanmatch.context_service.DTO.WeatherContext;
 import com.makanmatch.context_service.exception.OneMapException;
 import com.makanmatch.context_service.exception.NeaException;
 import com.makanmatch.context_service.provider.PlaceProvider;
+import com.makanmatch.context_service.provider.CatalogPlaceProvider;
+import com.makanmatch.context_service.provider.FixturePlaceProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -111,6 +116,61 @@ class PlaceQueryServiceTest {
         assertThat(response.places()).extracting("id").containsExactly("place");
         assertThat(response.weather().status()).isEqualTo("unavailable");
         assertThat(response.weather().multiplier()).isEqualTo(1.0);
+    }
+
+    @Test
+    void partialProviderCoverageIsReturnedWithSearchCount() {
+        PlaceDto place = new PlaceDto("place", "Place", ORIGIN_LAT, ORIGIN_LNG + 0.001);
+        PlaceProvider provider = new PlaceProvider() {
+            @Override public List<PlaceDto> getPlaces() { return List.of(place); }
+            @Override public String venueCoverage() { return "partial"; }
+            @Override public int venuesSearched() { return 25; }
+        };
+        OneMapClient client = mock(OneMapClient.class);
+        when(client.getWalkRoute(ORIGIN_LAT, ORIGIN_LNG, place.lat(), place.lng()))
+                .thenReturn(new WalkRouteDto(60, 100));
+        PlaceQueryService service = new PlaceQueryService(provider, client,
+                new OneMapProperties("", "", "", 200), new PlacesProperties(15),
+                mockWeather(RainCategory.NONE, 1.0));
+
+        NearbyResponse response = service.findNearby(ORIGIN_LAT, ORIGIN_LNG, 10);
+
+        assertThat(response.venueCoverage()).isEqualTo("partial");
+        assertThat(response.venuesSearched()).isEqualTo(25);
+    }
+
+    @Test
+    void emptyProviderReturnsUnavailableCoverageAndNoResults() {
+        OneMapClient client = mock(OneMapClient.class);
+        PlaceQueryService service = service(List.of(), client, 15, 200);
+
+        NearbyResponse response = service.findNearby(ORIGIN_LAT, ORIGIN_LNG, 10);
+
+        assertThat(response.places()).isEmpty();
+        assertThat(response.venueCoverage()).isEqualTo("unavailable");
+        assertThat(response.venuesSearched()).isZero();
+    }
+
+    @Test
+    void catalogProviderSkipsVenueWithNullCoordinates() {
+        VenueCacheService cache = mock(VenueCacheService.class);
+        when(cache.venues()).thenReturn(List.of(
+                new CatalogVenueDto("ok", "Valid", "", "", ORIGIN_LAT, ORIGIN_LNG, "", "", "", null, null),
+                new CatalogVenueDto("missing", "Missing", "", "", null, ORIGIN_LNG, "", "", "", null, null)));
+        CatalogPlaceProvider provider = new CatalogPlaceProvider(cache);
+
+        assertThat(provider.getPlaces()).extracting("id").containsExactly("ok");
+        assertThat(provider.skippedVenueCount()).isEqualTo(1);
+    }
+
+    @Test
+    void providerAnnotationsSelectCatalogByDefaultAndFixtureInTestProfile() {
+        ConditionalOnProperty catalogCondition = CatalogPlaceProvider.class.getAnnotation(ConditionalOnProperty.class);
+        ConditionalOnProperty fixtureCondition = FixturePlaceProvider.class.getAnnotation(ConditionalOnProperty.class);
+
+        assertThat(catalogCondition.havingValue()).isEqualTo("catalog");
+        assertThat(fixtureCondition.havingValue()).isEqualTo("fixture");
+        assertThat(FixturePlaceProvider.class.getAnnotation(Profile.class).value()).contains("test");
     }
 
     private static PlaceQueryService service(List<PlaceDto> places, OneMapClient client, int maxRouted,

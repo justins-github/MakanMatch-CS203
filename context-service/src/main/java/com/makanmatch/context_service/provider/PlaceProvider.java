@@ -6,4 +6,12 @@ import java.util.List;
 
 public interface PlaceProvider {
     List<PlaceDto> getPlaces();
+
+    default String venueCoverage() {
+        return getPlaces().isEmpty() ? "unavailable" : "full";
+    }
+
+    default int venuesSearched() {
+        return getPlaces().size();
+    }
 }

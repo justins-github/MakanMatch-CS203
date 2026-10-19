@@ -8,6 +8,7 @@ onemap:
   walk-speed-m-per-min: ${ONEMAP_WALK_SPEED_M_PER_MIN:80}
 
 places:
+  provider: ${PLACES_PROVIDER:catalog}
   max-routed: ${PLACES_MAX_ROUTED:15}
 
 nea:
