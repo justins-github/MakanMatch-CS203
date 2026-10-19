@@ -11,6 +11,13 @@ places:
   provider: ${PLACES_PROVIDER:catalog}
   max-routed: ${PLACES_MAX_ROUTED:15}
 
+prices:
+  provider: ${PRICES_PROVIDER:catalog}
+
+price:
+  band-low-max: ${PRICE_BAND_LOW_MAX:10}
+  band-mid-max: ${PRICE_BAND_MID_MAX:30}
+
 nea:
   base-url: https://api-open.data.gov.sg/v2/real-time/api
   api-key: ${NEA_API_KEY:}
