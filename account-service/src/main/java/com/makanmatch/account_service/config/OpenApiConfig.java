@@ -19,8 +19,9 @@ public class OpenApiConfig {
 						.title("MakanMatch Account Service")
 						.version("v1")
 						.description("""
-								Sign-up and login (Supabase Auth underneath), profiles, venue ownership claims \
-								and admin user management. To try protected routes: call POST /api/auth/login, \
+								Sign-up and login (Supabase Auth underneath), profiles, kakis and saved groups, \
+								venue ownership claims and admin user management. To try protected routes: \
+								call POST /api/auth/login, \
 								copy accessToken from the response, press Authorize and paste it."""))
 				.components(new Components().addSecuritySchemes("bearer", new SecurityScheme()
 						.type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT")));
