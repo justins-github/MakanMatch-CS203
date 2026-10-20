@@ -1,0 +1,1467 @@
+/* MakanMatch demo - hawker-signboard system.
+   Tokens: paper (melamine white), ink, chili, kunyit, pandan, monsoon. */
+
+:root {
+  --paper: #fffdf9;
+  --paper-dim: #f4efe4;
+  --ink: #201b15;
+  --ink-soft: #6b6257;
+  --chili: #d6342c;
+  --kunyit: #ffc42e;
+  --pandan: #237a57;
+  --monsoon: #46689b;
+  --monsoon-wash: #e3eaf4;
+  --pandan-wash: #dcefe4;
+  --line: 2px solid var(--ink);
+  --font-display: 'Anton', 'Arial Narrow', sans-serif;
+  --font-body: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  --font-data: 'IBM Plex Mono', Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper-dim);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+#root {
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.phone {
+  width: 100%;
+  max-width: 430px;
+  min-height: 100vh;
+  background: var(--paper);
+  border-left: var(--line);
+  border-right: var(--line);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- app shell: top bar, bottom bar, splash ---------- */
+
+/* Signed in, the bottom bar is fixed over the page, so pages end above it. */
+.phone.with-nav {
+  padding-bottom: 92px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px 8px;
+}
+
+.topbar-me {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.weather {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.weather-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  padding: 4px 11px;
+  font-family: var(--font-data);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.weather-chip.raining {
+  background: var(--monsoon);
+  border-color: var(--monsoon);
+  color: var(--paper);
+}
+
+.weather-sim {
+  appearance: none;
+  border: 1.5px dashed var(--ink-soft);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  padding: 3px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.weather-sim[aria-pressed='true'] {
+  border-style: solid;
+  border-color: var(--monsoon);
+  color: var(--monsoon);
+}
+
+/* The same five tabs for everyone, pinned to the bottom of the phone. */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  width: 100%;
+  max-width: 430px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: end;
+  padding: 8px 4px 14px;
+  background: var(--paper);
+  border-top: var(--line);
+}
+
+.nav-item {
+  appearance: none;
+  border: none;
+  background: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  font-family: var(--font-body);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.nav-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 28px;
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+}
+
+.nav-item[aria-current='page'] {
+  color: var(--ink);
+}
+
+.nav-item[aria-current='page'] .nav-icon {
+  background: var(--kunyit);
+  border-color: var(--ink);
+}
+
+/* Review: the raised + in the middle. */
+.nav-fab {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin-top: -30px;
+  border: var(--line);
+  border-radius: 50%;
+  background: var(--chili);
+  color: var(--paper);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.nav-fab svg {
+  width: 26px;
+  height: 26px;
+}
+
+.nav-review[aria-current='page'] .nav-fab {
+  box-shadow: none;
+  transform: translate(2px, 2px);
+}
+
+.nav-item:focus-visible,
+.topbar-me:focus-visible,
+.weather-sim:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: 2px;
+}
+
+/* While the session loads: the logo, on chili red. */
+.splash {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+  background: var(--chili);
+  color: var(--paper);
+  text-align: center;
+  transition: opacity 0.25s ease;
+}
+
+/* The pieces arrive one after another; then the whole splash fades out. */
+.splash > * {
+  animation: splash-rise 0.5s ease-out both;
+}
+
+.splash.leaving {
+  opacity: 0;
+}
+
+.splash-tile {
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border: 3px solid var(--ink);
+  border-radius: 22px;
+  background: var(--kunyit);
+  color: var(--ink);
+  box-shadow: 4px 4px 0 var(--ink);
+  font-family: var(--font-display);
+  font-size: 44px;
+  transform: rotate(-6deg);
+  animation: splash-pop 0.55s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.splash-logo {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 54px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.splash-logo span {
+  color: var(--kunyit);
+}
+
+.splash-tagline {
+  margin: 0;
+  font-family: var(--font-data);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.splash-wait {
+  margin: 28px 0 0;
+  font-family: var(--font-data);
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.splash .splash-logo { animation-delay: 0.15s; }
+.splash .splash-tagline { animation-delay: 0.3s; }
+.splash .splash-wait {
+  animation:
+    splash-rise 0.5s ease-out 0.45s both,
+    splash-pulse 1.2s ease-in-out 0.95s infinite;
+}
+
+@keyframes splash-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes splash-pop {
+  from { opacity: 0; transform: scale(0.5) rotate(-24deg); }
+  to { opacity: 1; transform: scale(1) rotate(-6deg); }
+}
+
+@keyframes splash-pulse {
+  50% { opacity: 0.4; }
+}
+
+/* The screen after the splash fades in rather than cutting. */
+.fade-in {
+  animation: fade-in 0.35s ease-out both;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-review[aria-current='page'] .nav-fab {
+    transform: none;
+  }
+
+  .splash,
+  .splash > *,
+  .splash .splash-wait,
+  .fade-in {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* ---------- feed ---------- */
+
+.feed {
+  flex: 1;
+  padding: 16px 18px 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.feed .rerank-note {
+  font-family: var(--font-data);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+
+.card {
+  position: relative;
+  border: var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: 4px 4px 0 var(--ink);
+  padding: 14px 74px 14px 14px;
+  animation: rise 0.35s both;
+  animation-delay: calc(var(--i) * 45ms);
+}
+
+.card.experimental {
+  border-style: dashed;
+  border-color: var(--chili);
+  box-shadow: 4px 4px 0 var(--chili);
+}
+
+.card .exp-eyebrow {
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--chili);
+  margin-bottom: 4px;
+}
+
+.card h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.card .dish {
+  color: var(--chili);
+  font-weight: 500;
+  font-size: 13.5px;
+  margin-top: 1px;
+}
+
+.card .meta {
+  font-family: var(--font-data);
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 4px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 9px;
+}
+
+.why {
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11.5px;
+  background: var(--paper);
+}
+
+.why.lead {
+  background: var(--kunyit);
+}
+
+.confidence {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-family: var(--font-data);
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink);
+  background: transparent;
+}
+
+.dot.on-high { background: var(--pandan); }
+.dot.on-medium { background: var(--kunyit); }
+.dot.on-low { background: var(--chili); }
+
+/* signature: match-score price sticker */
+
+.sticker {
+  position: absolute;
+  top: -10px;
+  right: -8px;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  border: var(--line);
+  background: var(--kunyit);
+  transform: rotate(-7deg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.sticker .pct {
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.sticker .label {
+  font-family: var(--font-data);
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.card.experimental .sticker {
+  background: var(--chili);
+  color: var(--paper);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+/* ---------- for-you landing ---------- */
+
+.landing {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 22px;
+}
+
+.landing-loc {
+  font-family: var(--font-data);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.landing-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 28px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.landing-note {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.big-btn {
+  appearance: none;
+  border: var(--line);
+  border-radius: 12px;
+  background: var(--kunyit);
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 21px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 22px 16px;
+  cursor: pointer;
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.big-btn.surprise {
+  background: var(--chili);
+  color: var(--paper);
+}
+
+.big-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.big-btn:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: 2px;
+}
+
+/* ---------- mood bar ---------- */
+
+.moodbar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;
+  display: flex;
+  gap: 8px;
+  padding: 12px 18px 16px;
+  background: var(--paper);
+  border-top: var(--line);
+}
+
+.chip {
+  flex: 1;
+  appearance: none;
+  border: var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 12.5px;
+  padding: 8px 4px;
+  cursor: pointer;
+}
+
+.chip[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* ---------- taste dna ---------- */
+
+.dna {
+  flex: 1;
+  padding: 18px;
+}
+
+.dna h2,
+.dna h3 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin: 0 0 10px;
+}
+
+.dna h3 {
+  font-size: 16px;
+  margin-top: 22px;
+}
+
+.radar-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+.dna-history {
+  margin-top: 4px;
+  padding: 12px 10px 10px;
+  border: 1.5px solid var(--ink);
+  border-radius: 10px;
+  background: var(--paper-dim);
+}
+
+.dna-history h3 {
+  margin-top: 0;
+}
+
+.history-note,
+.history-empty {
+  margin: -4px 0 8px;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.history-chart {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+
+.history-grid {
+  stroke: var(--ink-soft);
+  stroke-width: 1;
+  opacity: 0.3;
+}
+
+.history-axis-label {
+  fill: var(--ink-soft);
+  font-family: var(--font-data);
+  font-size: 9px;
+}
+
+.history-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 10px;
+}
+
+.history-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.history-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.affinity {
+  display: grid;
+  grid-template-columns: 110px 1fr 34px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+  font-size: 13px;
+}
+
+.affinity .bar {
+  height: 12px;
+  border: 1.5px solid var(--ink);
+  border-radius: 4px;
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.affinity .fill {
+  display: block;
+  height: 100%;
+  background: var(--pandan);
+}
+
+.affinity .val {
+  font-family: var(--font-data);
+  font-size: 11px;
+  text-align: right;
+  color: var(--ink-soft);
+}
+
+.recent-note {
+  margin-top: 18px;
+  border: 1.5px dashed var(--ink-soft);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.recent-note strong {
+  color: var(--ink);
+}
+
+/* ---------- rate dishes ---------- */
+
+.teach-btn:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: 2px;
+}
+
+.rate {
+  flex: 1;
+  padding: 16px 18px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rate-intro {
+  font-family: var(--font-data);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+
+.meter {
+  border: var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 10px 12px;
+}
+
+.meter-label {
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.meter-empty {
+  font-size: 13px;
+  margin-top: 3px;
+}
+
+.meter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 5px;
+}
+
+.meter-bar {
+  flex: 1;
+  height: 12px;
+  border: 1.5px solid var(--ink);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.meter-fill {
+  display: block;
+  height: 100%;
+  background: var(--pandan);
+  transition: width 0.4s ease;
+}
+
+.meter-val {
+  font-family: var(--font-data);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.delta-panel {
+  border: 2px solid var(--pandan);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: 3px 3px 0 var(--pandan);
+  padding: 10px 12px;
+  animation: rise 0.3s both;
+}
+
+.delta-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.delta-predict {
+  font-family: var(--font-data);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  margin: 3px 0 7px;
+}
+
+.delta-row {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 12.5px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.delta-arrow.up { color: var(--pandan); }
+.delta-arrow.down { color: var(--chili); }
+
+.delta-dim {
+  font-weight: 600;
+}
+
+.delta-vals {
+  font-family: var(--font-data);
+  font-size: 11.5px;
+}
+
+.delta-reason {
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
+
+.teach-btn {
+  margin-top: 10px;
+  appearance: none;
+  border: var(--line);
+  border-radius: 8px;
+  background: var(--kunyit);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 7px 14px;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.teach-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  box-shadow: none;
+}
+
+/* ---------- review wizard ---------- */
+
+.search-input {
+  width: 100%;
+  border: var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 9px 12px;
+}
+
+.search-input:focus-visible,
+.review-text:focus-visible,
+.venue-row:focus-visible,
+.sentiment:focus-visible,
+.duel-card:focus-visible,
+.back-link:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: 2px;
+}
+
+.venue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.venue-row {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  border: var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: 2px 2px 0 var(--ink);
+  padding: 10px 12px;
+  cursor: pointer;
+  font-family: var(--font-body);
+}
+
+.venue-row-name {
+  font-weight: 600;
+  font-size: 14.5px;
+  display: block;
+}
+
+.venue-row-meta {
+  font-family: var(--font-data);
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+/* the part of the name that matches what was typed */
+.venue-row-name b {
+  color: var(--chili);
+}
+
+/* appended location when several outlets share a name */
+.venue-row-loc {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.venue-row-scores {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.pill {
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.pill.ai {
+  background: var(--kunyit);
+}
+
+.pill.you {
+  background: var(--pandan);
+  color: var(--paper);
+  border-color: var(--pandan);
+}
+
+.back-link {
+  appearance: none;
+  border: none;
+  background: transparent;
+  font-family: var(--font-data);
+  font-size: 12px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  text-align: left;
+  padding: 2px 0;
+}
+
+.step-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 22px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.sentiments {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sentiment {
+  appearance: none;
+  border: var(--line);
+  border-radius: 10px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 15px;
+  padding: 14px;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.sentiment.loved { background: var(--pandan); color: var(--paper); }
+.sentiment.fine { background: var(--kunyit); }
+.sentiment.disliked { background: var(--chili); color: var(--paper); }
+
+.duel {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.duel-card {
+  flex: 1;
+  appearance: none;
+  border: var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 16px 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--font-body);
+}
+
+.duel-name {
+  font-weight: 600;
+  font-size: 14.5px;
+}
+
+.duel-venue {
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  color: var(--ink-soft);
+}
+
+.duel-vs {
+  align-self: center;
+  font-family: var(--font-display);
+  font-size: 16px;
+  text-transform: uppercase;
+}
+
+.review-text {
+  width: 100%;
+  border: var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.add-dish {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1.5px dashed var(--ink-soft);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.score-badge {
+  border: var(--line);
+  border-radius: 10px;
+  background: var(--kunyit);
+  box-shadow: 4px 4px 0 var(--ink);
+  padding: 14px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.score-big {
+  font-family: var(--font-display);
+  font-size: 34px;
+}
+
+.score-rank {
+  font-family: var(--font-data);
+  font-size: 12px;
+}
+
+.board {
+  border: var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 10px 12px;
+}
+
+.board-title {
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 6px;
+}
+
+.board-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  padding: 3px 0;
+}
+
+.board-rank {
+  font-family: var(--font-data);
+  font-size: 11px;
+  color: var(--ink-soft);
+  width: 24px;
+  flex-shrink: 0;
+}
+
+.board-name {
+  flex: 1;
+  font-weight: 500;
+}
+
+.board-venue {
+  font-weight: 400;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
+
+.board-score {
+  font-family: var(--font-data);
+  font-weight: 500;
+}
+
+/* ---------- shared ---------- */
+
+.loading,
+.error {
+  padding: 32px 18px;
+  font-family: var(--font-data);
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.error {
+  color: var(--chili);
+}
+
+/* ---------- shared building blocks for account, owner and admin screens ---------- */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 14px;
+}
+
+.panel-title {
+  font-family: var(--font-data);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.panel-note {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+
+/* Folds: collapsible panels (Accordion.jsx). Closed they read as a list of
+   signboards; open, the body sits under a dashed tear line. */
+.fold {
+  padding: 0;
+  gap: 0;
+}
+
+.fold-heading {
+  margin: 0;
+  font: inherit;
+}
+
+.fold-head {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  padding: 13px 14px;
+  cursor: pointer;
+}
+
+.fold.open > .fold-heading .fold-head {
+  border-radius: 10px 10px 0 0;
+}
+
+@media (hover: hover) {
+  .fold-head:hover {
+    background: var(--paper-dim);
+  }
+}
+
+.fold-head:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: 2px;
+}
+
+.fold-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fold-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.fold-summary {
+  font-family: var(--font-data);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fold-aside {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.fold-arrow {
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.fold.open > .fold-heading .fold-arrow {
+  transform: rotate(180deg);
+}
+
+.fold-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px 14px;
+  border-top: 1.5px dashed var(--ink-soft);
+}
+
+.fold-body[hidden] {
+  display: none;
+}
+
+/* A fold inside a fold: thinner line, no shadow, a body-weight title. */
+.fold.sub {
+  border-width: 1.5px;
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.fold.sub .fold-head {
+  padding: 9px 12px;
+  border-radius: 8px;
+}
+
+.fold.sub.open > .fold-heading .fold-head {
+  border-radius: 8px 8px 0 0;
+}
+
+.fold.sub .fold-title {
+  font-family: var(--font-body);
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.fold.sub .fold-body {
+  padding: 10px 12px 12px;
+}
+
+.fold-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Edits that haven't been saved: under the save button, and on a closed fold's header. */
+.unsaved {
+  margin: 0;
+  font-family: var(--font-data);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--chili);
+}
+
+.unsaved::before {
+  content: '● ';
+}
+
+.fold-head .unsaved {
+  font-size: 10.5px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field > span {
+  font-family: var(--font-data);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  border: var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 9px 11px;
+  resize: vertical;
+}
+
+.field small {
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  color: var(--ink-soft);
+}
+
+.field input:focus-visible,
+.field textarea:focus-visible,
+.btn:focus-visible,
+.chip:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: 2px;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.btn {
+  appearance: none;
+  border: var(--line);
+  border-radius: 8px;
+  background: var(--kunyit);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 7px 13px;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.btn.go {
+  background: var(--pandan);
+  color: var(--paper);
+}
+
+.btn.stop {
+  background: var(--chili);
+  color: var(--paper);
+}
+
+.btn.quiet {
+  background: var(--paper);
+  box-shadow: none;
+}
+
+.btn:active:not(:disabled) {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  box-shadow: none;
+}
+
+.ok-note {
+  font-family: var(--font-data);
+  font-size: 12px;
+  color: var(--pandan);
+}
+
+.panel .error,
+.panel .loading,
+.account .error,
+.owner .error,
+.admin .error,
+.admin .loading {
+  padding: 4px 0;
+}
+
+.plain-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+}
+
+/* status pills shared by claims, owners and accounts */
+.pill.pending { background: var(--kunyit); }
+.pill.approved { background: var(--pandan); border-color: var(--pandan); color: var(--paper); }
+.pill.rejected { background: var(--chili); border-color: var(--chili); color: var(--paper); }
+.pill.withdrawn,
+.pill.quiet { background: var(--paper-dim); color: var(--ink-soft); border-color: var(--ink-soft); }
+.pill.role { background: var(--ink); color: var(--paper); }
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none;
+  }
+
+  .fold-arrow {
+    transition: none;
+  }
+}
+
+@media (max-width: 460px) {
+  .phone {
+    border-left: none;
+    border-right: none;
+  }
+}
+
+/* ---------- owner updates on venue cards ---------- */
+
+.owner-update {
+  margin-top: 8px;
+  padding: 6px 9px;
+  border-left: 4px solid var(--monsoon);
+  background: var(--paper-dim);
+  font-size: 13px;
+}
+
+.owner-update.moved {
+  border-left-color: var(--kunyit);
+}
+
+/* Owner-set hours; shut venues never reach the feed, so this always reads "open". */
+.hours-line {
+  margin-top: 6px;
+  font-family: var(--font-data);
+  font-size: 12px;
+  color: var(--pandan);
+}
+
+.hours-line::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--pandan);
+  vertical-align: 1px;
+}
+
+/* No owner hours (most Overture venues): we can't vouch that it's open. */
+.hours-line.unknown {
+  color: var(--ink-soft);
+}
+
+.hours-line.unknown::before {
+  background: var(--ink-soft);
+}
+
+.owner-update-label {
+  display: block;
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}

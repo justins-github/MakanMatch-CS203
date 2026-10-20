@@ -1,0 +1,471 @@
+/* ---------- kakis: people you eat with, and eating together ---------- */
+
+.kaki-avatar {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-data);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.kaki-avatar.small {
+  width: 22px;
+  height: 22px;
+  font-size: 9.5px;
+}
+
+.kaki-avatar.large {
+  width: 54px;
+  height: 54px;
+  font-size: 16px;
+}
+
+.kaki-avatar.tint-kunyit { background: var(--kunyit); }
+.kaki-avatar.tint-pandan { background: var(--pandan-wash); }
+.kaki-avatar.tint-monsoon { background: var(--monsoon-wash); }
+.kaki-avatar.tint-dim { background: var(--paper-dim); }
+
+.kaki-handle {
+  font-family: var(--font-data);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+
+.kaki-label {
+  margin-bottom: 6px;
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.kaki-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.kaki-chip {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 3px 12px 3px 4px;
+  cursor: pointer;
+}
+
+.kaki-chip[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* You're always at the table, so your chip isn't a button. */
+.kaki-chip.you {
+  cursor: default;
+  background: var(--kunyit);
+}
+
+.kaki-chip.group {
+  padding-left: 12px;
+  border-color: var(--ink-soft);
+}
+
+.kaki-chip:focus-visible,
+.company-switch button:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: 2px;
+}
+
+.kaki-group-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  border: 1.5px dashed var(--ink-soft);
+  border-radius: 12px;
+  background: var(--paper-dim);
+  padding: 12px;
+}
+
+/* Your own @, to send to friends. Without one, a nudge to set it. */
+.kaki-share {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1.5px solid var(--ink);
+  border-radius: 10px;
+  background: var(--pandan-wash);
+  padding: 7px 8px 7px 12px;
+  font-family: var(--font-data);
+  font-size: 12px;
+}
+
+.kaki-share.missing {
+  background: var(--paper-dim);
+  border-color: var(--ink-soft);
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+
+.kaki-share .btn {
+  flex-shrink: 0;
+}
+
+.kaki-add {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kaki-add-row {
+  display: flex;
+  gap: 6px;
+}
+
+.kaki-add-row input {
+  flex: 1;
+  min-width: 0;
+  border: var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-data);
+  font-size: 14px;
+  padding: 8px 10px;
+}
+
+/* Requests waiting for you: yellow cards you can't miss. */
+.kaki-requests {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.kaki-request {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: var(--line);
+  border-radius: 12px;
+  background: #fff3cf;
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 11px 12px;
+  font-size: 14px;
+}
+
+.kaki-request-who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Your kakis as faces. */
+.kaki-faces {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px 6px;
+}
+
+.kaki-face {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 2px;
+  cursor: pointer;
+}
+
+.kaki-face[aria-pressed='true'] {
+  background: var(--paper-dim);
+}
+
+.kaki-face[aria-pressed='true'] .kaki-avatar,
+.kaki-face[aria-pressed='true'] .kaki-face-plus {
+  border-width: 2.5px;
+}
+
+.kaki-face-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Asked, not yet accepted. */
+.kaki-face.asked .kaki-avatar {
+  border-style: dashed;
+  opacity: 0.55;
+}
+
+.kaki-face.asked .kaki-face-name {
+  color: var(--ink-soft);
+}
+
+.kaki-face-note {
+  margin-top: -4px;
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
+.kaki-face-plus {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border: 2px dashed var(--ink-soft);
+  border-radius: 50%;
+  font-size: 24px;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
+/* What opens under the faces: a person's details, or the add box. */
+.kaki-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  border: 1.5px solid var(--ink);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.kaki-panel .kaki-add {
+  flex: 1;
+}
+
+.kaki-panel-text {
+  min-width: 0;
+  font-size: 14px;
+}
+
+/* Groups as cards that start a meal. */
+.kaki-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.kaki-groups .kaki-label {
+  margin-bottom: 0;
+}
+
+.kaki-group-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: var(--line);
+  border-radius: 12px;
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 11px 12px;
+}
+
+.kaki-group-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 15px;
+}
+
+.kaki-stack {
+  display: flex;
+}
+
+.kaki-stack .kaki-avatar + .kaki-avatar {
+  margin-left: -6px;
+}
+
+.kaki-group-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.kaki-link {
+  appearance: none;
+  border: none;
+  background: none;
+  color: var(--ink-soft);
+  font-family: var(--font-data);
+  font-size: 11.5px;
+  text-decoration: underline;
+  padding: 0;
+  cursor: pointer;
+}
+
+.kaki-new-group {
+  appearance: none;
+  border: 1.5px dashed var(--ink-soft);
+  border-radius: 12px;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 10px;
+  cursor: pointer;
+}
+
+.btn.kaki-delete {
+  margin-left: auto;
+  color: var(--chili);
+  border-color: var(--chili);
+}
+
+/* A new user's page: three steps. */
+.kaki-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.kaki-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: var(--line);
+  border-radius: 12px;
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 12px;
+}
+
+.kaki-step.later {
+  border-style: dashed;
+  border-color: var(--ink-soft);
+  box-shadow: none;
+  color: var(--ink-soft);
+}
+
+.kaki-step-num {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-data);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kaki-step.done .kaki-step-num {
+  background: var(--pandan);
+}
+
+.kaki-step.later .kaki-step-num {
+  background: var(--ink-soft);
+}
+
+.kaki-step-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14.5px;
+}
+
+.kaki-step-btn {
+  align-self: flex-start;
+}
+
+.kaki-waiting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.kaki-face:focus-visible,
+.kaki-link:focus-visible,
+.kaki-new-group:focus-visible,
+.kaki-add-row input:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: 2px;
+}
+
+/* "Just me / With friends" */
+.company-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin: 12px 18px 0;
+  border: var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.company-switch button {
+  appearance: none;
+  border: none;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 8px 0;
+  cursor: pointer;
+}
+
+.company-switch button[aria-checked='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.big-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Each person's own score on a group card. */
+.group-scores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 8px;
+}
+
+.group-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-data);
+  font-size: 12px;
+}
