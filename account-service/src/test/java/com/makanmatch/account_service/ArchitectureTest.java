@@ -42,7 +42,8 @@ class ArchitectureTest {
 			noClasses().that().resideInAPackage(ROOT + ".common..")
 					.should().dependOnClassesThat().resideInAnyPackage(
 							ROOT + ".admin..", ROOT + ".auth..", ROOT + ".claim..", ROOT + ".config..",
-							ROOT + ".owner..", ROOT + ".profile..", ROOT + ".security..", ROOT + ".supabase..");
+							ROOT + ".kaki..", ROOT + ".owner..", ROOT + ".profile..", ROOT + ".security..",
+							ROOT + ".supabase..");
 
 	@ArchTest
 	static final ArchRule onlyTheSupabasePackageTalksToSupabaseDirectly =
