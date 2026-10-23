@@ -10,7 +10,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.makanmatch.account_service.claim.dto.ClaimResponse;
 import com.makanmatch.account_service.claim.dto.CreateClaimRequest;
 import com.makanmatch.account_service.common.ConflictException;
-import com.makanmatch.account_service.common.ForbiddenException;
 import com.makanmatch.account_service.common.NotFoundException;
 import com.makanmatch.account_service.owner.OwnershipService;
 import com.makanmatch.account_service.profile.Profile;
@@ -18,7 +17,8 @@ import com.makanmatch.account_service.profile.ProfileService;
 
 /**
  * Venue ownership claims: anyone can ask, an admin decides, and approval is
- * what grants ownership. An admin can't approve their own claim.
+ * what grants ownership. An admin's own claim is approved at once: admins can
+ * approve anyone's claim anyway, and a lone admin would otherwise be stuck.
  */
 @Service
 @Transactional
@@ -44,6 +44,8 @@ public class ClaimService {
 		}
 		VenueClaim claim = claims.save(
 				new VenueClaim(userId, venueId, request.venueName().trim(), request.proof().trim()));
+		// The real account flag, so this holds while an admin is viewing as someone else.
+		if (profiles.isAdmin(userId)) grant(claim, userId);
 		return toResponses(List.of(claim)).get(0);
 	}
 
@@ -71,12 +73,13 @@ public class ClaimService {
 
 	public ClaimResponse approve(UUID adminId, UUID claimId) {
 		VenueClaim claim = find(claimId);
-		if (claim.getUserId().equals(adminId)) {
-			throw new ForbiddenException("Another admin has to approve your own claim");
-		}
+		grant(claim, adminId);
+		return toResponses(List.of(claim)).get(0);
+	}
+
+	private void grant(VenueClaim claim, UUID adminId) {
 		claim.approve(adminId);
 		ownership.grant(claim.getUserId(), claim.getVenueId(), claim.getVenueName(), claim.getId());
-		return toResponses(List.of(claim)).get(0);
 	}
 
 	public ClaimResponse reject(UUID adminId, UUID claimId, String reason) {

@@ -157,10 +157,16 @@ function PasswordForm() {
 }
 
 function Claims() {
-  const { me, reloadMe } = useAuth()
+  const { me, role, reloadMe } = useAuth()
   const [claims, setClaims] = useState(null)
   const [claiming, setClaiming] = useState(false)
   const [error, setError] = useState(null)
+  const [note, setNote] = useState(null)
+  // An admin viewing as a diner sees what a diner would: a plain diner runs no
+  // venue, so has no venues here and no approved claims.
+  const asDiner = me.admin && role === 'USER'
+  const owned = asDiner ? [] : me.ownedVenues
+  const shownClaims = asDiner ? claims?.filter((c) => c.status !== 'APPROVED') : claims
 
   const load = () =>
     myClaims()
@@ -180,22 +186,30 @@ function Claims() {
     }
   }
 
-  const claimed = async () => {
+  // An admin's own claim is approved at once, so say where the venue went.
+  const claimed = async (claim) => {
     setClaiming(false)
+    if (claim?.status === 'APPROVED') {
+      setNote(
+        asDiner
+          ? `${claim.venueName} is yours straight away, since you're an admin. Switch View as to Owner or Admin to manage it.`
+          : `${claim.venueName} is yours straight away, since you're an admin. It's in My venues.`,
+      )
+    }
     await Promise.all([load(), reloadMe()])
   }
 
   const waiting = claims?.filter((c) => c.status === 'PENDING').length ?? 0
   const summary = [
-    me.ownedVenues.map((v) => v.venueName).join(', '),
+    owned.map((v) => v.venueName).join(', '),
     waiting > 0 && `${waiting} claim${waiting === 1 ? '' : 's'} waiting`,
   ].filter(Boolean).join(' · ') || 'None yet'
 
   return (
     <Fold id="venues" title="Venues you run" summary={summary}>
-      {me.ownedVenues.length > 0 ? (
+      {owned.length > 0 ? (
         <ul className="plain-list">
-          {me.ownedVenues.map((v) => (
+          {owned.map((v) => (
             <li key={v.venueId}>
               <span className="pill approved">Owner</span> {v.venueName}
             </li>
@@ -207,9 +221,9 @@ function Claims() {
         </p>
       )}
 
-      {claims?.length > 0 && (
+      {shownClaims?.length > 0 && (
         <ul className="claim-list">
-          {claims.map((c) => (
+          {shownClaims.map((c) => (
             <li key={c.id} className="claim-item">
               <div className="claim-head">
                 <span className="claim-venue">{c.venueName}</span>
@@ -226,6 +240,7 @@ function Claims() {
         </ul>
       )}
 
+      {note && <div className="ok-note">{note}</div>}
       {error && <div className="error">{error}</div>}
 
       {claiming ? (
@@ -241,7 +256,8 @@ function Claims() {
   )
 }
 
-export default function Profile() {
+// children: what Me adds under the profile (owner and admin tools, View as, log out).
+export default function Profile({ children }) {
   const { me } = useAuth()
   return (
     <main className="account">
@@ -262,6 +278,7 @@ export default function Profile() {
         <Claims />
         <PasswordForm />
       </Accordion>
+      {children}
     </main>
   )
 }

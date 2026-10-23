@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { approveClaim, listClaims, rejectClaim, withdrawClaim } from '../../api/accountApi.js'
+import { approveClaim, listClaims, rejectClaim } from '../../api/accountApi.js'
 import { useAuth } from '../../auth/AuthContext.jsx'
 import { Accordion, Fold, Unsaved } from '../Accordion.jsx'
 
@@ -47,16 +47,7 @@ function ClaimCard({ claim, isMine, onDecided }) {
         {claim.rejectReason && <div className="claim-reason">Rejected: “{claim.rejectReason}”</div>}
 
         {claim.status === 'PENDING' && (
-          isMine ? (
-            <>
-              <p className="panel-note">This is your own claim, so another admin has to approve or reject it.</p>
-              <div className="row-actions">
-                <button type="button" className="btn quiet" disabled={busy} onClick={() => decide(() => withdrawClaim(claim.id))}>
-                  Withdraw my claim
-                </button>
-              </div>
-            </>
-          ) : rejecting ? (
+          rejecting ? (
             <div className="reject-box">
               <label className="field">
                 <span>Why? {claim.claimant.displayName ?? 'They'} will see this</span>

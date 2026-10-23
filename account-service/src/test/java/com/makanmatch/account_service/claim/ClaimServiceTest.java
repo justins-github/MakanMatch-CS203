@@ -22,7 +22,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.makanmatch.account_service.claim.dto.ClaimResponse;
 import com.makanmatch.account_service.claim.dto.CreateClaimRequest;
 import com.makanmatch.account_service.common.ConflictException;
-import com.makanmatch.account_service.common.ForbiddenException;
 import com.makanmatch.account_service.common.NotFoundException;
 import com.makanmatch.account_service.owner.OwnershipService;
 import com.makanmatch.account_service.profile.ProfileService;
@@ -81,10 +80,30 @@ class ClaimServiceTest {
 	}
 
 	@Test
-	void adminsCannotApproveTheirOwnClaims() {
+	void anAdminsClaimIsApprovedAtOnce() {
+		given(profiles.isAdmin(ADMIN)).willReturn(true);
+
+		ClaimResponse created = service.create(ADMIN, REQUEST);
+
+		assertThat(created.status()).isEqualTo(ClaimStatus.APPROVED);
+		verify(ownership).grant(ADMIN, "turks-kebab", "Turk's Kebab", created.id());
+	}
+
+	@Test
+	void adminsCanApproveTheirOwnOlderClaims() {
 		VenueClaim claim = pendingClaim(ADMIN);
 
-		assertThatThrownBy(() -> service.approve(ADMIN, claim.getId())).isInstanceOf(ForbiddenException.class);
+		ClaimResponse approved = service.approve(ADMIN, claim.getId());
+
+		assertThat(approved.status()).isEqualTo(ClaimStatus.APPROVED);
+		verify(ownership).grant(ADMIN, "turks-kebab", "Turk's Kebab", claim.getId());
+	}
+
+	@Test
+	void aDinersClaimStillWaitsForAnAdmin() {
+		ClaimResponse created = service.create(OWNER, REQUEST);
+
+		assertThat(created.status()).isEqualTo(ClaimStatus.PENDING);
 		verify(ownership, never()).grant(any(), anyString(), anyString(), any());
 	}
 
