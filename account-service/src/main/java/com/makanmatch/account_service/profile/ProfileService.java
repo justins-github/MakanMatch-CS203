@@ -72,6 +72,12 @@ public class ProfileService {
 		return profiles.findByUsername(UsernameRules.normalize(username)).map(Profile::getId);
 	}
 
+	/** The account's real admin flag, whatever role it's being viewed as. */
+	@Transactional(readOnly = true)
+	public boolean isAdmin(UUID id) {
+		return get(id).isAdmin();
+	}
+
 	@Transactional(readOnly = true)
 	public long countActiveAdmins() {
 		return profiles.countByAdminTrueAndDisabledFalse();

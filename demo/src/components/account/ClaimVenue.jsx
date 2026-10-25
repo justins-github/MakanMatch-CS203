@@ -39,8 +39,8 @@ export default function ClaimVenue({ onClaimed, onCancel }) {
     setBusy(true)
     setError(null)
     try {
-      await claimVenue(venue.id, venue.name, proof.trim())
-      onClaimed()
+      const claim = await claimVenue(venue.id, venue.name, proof.trim())
+      onClaimed(claim)
     } catch (err) {
       setError(err.message)
       setBusy(false)
