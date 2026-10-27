@@ -1,0 +1,467 @@
+/* ---------- owner: venue status and menu ---------- */
+
+.owner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px 32px;
+}
+
+.owner-venue-head {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.status-now {
+  font-size: 13.5px;
+}
+
+.status-when {
+  font-family: var(--font-data);
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.status-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.status-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.status-choice {
+  appearance: none;
+  border: var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 13.5px;
+  padding: 11px 8px;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.status-choice[aria-checked='true'] {
+  box-shadow: none;
+  transform: translate(2px, 2px);
+}
+
+.status-choice.open[aria-checked='true'] { background: var(--pandan); color: var(--paper); }
+.status-choice.paused[aria-checked='true'] { background: var(--kunyit); }
+.status-choice.closed[aria-checked='true'] { background: var(--chili); color: var(--paper); }
+.status-choice.moved[aria-checked='true'] { background: var(--monsoon); color: var(--paper); }
+
+.status-choice:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: 2px;
+}
+
+.status-history summary {
+  font-family: var(--font-data);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+/* ---------- opening hours ---------- */
+
+.hours-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hours-week {
+  display: flex;
+  flex-direction: column;
+}
+
+/* One line per day: name, switch, times, ⋯. A second session and the menu go on lines below. */
+.hours-day {
+  display: grid;
+  grid-template-columns: 30px 34px minmax(0, 1fr) 20px;
+  gap: 6px;
+  align-items: center;
+  padding: 7px 0;
+  border-top: 1px solid var(--paper-dim);
+}
+
+.hours-day:first-child {
+  border-top: none;
+}
+
+.hours-day-name {
+  grid-column: 1;
+  font-family: var(--font-data);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.hours-switch {
+  grid-column: 2;
+  appearance: none;
+  position: relative;
+  width: 34px;
+  height: 20px;
+  padding: 0;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper-dim);
+  cursor: pointer;
+}
+
+.hours-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--ink-soft);
+  transition: left 0.15s ease;
+}
+
+.hours-switch[aria-checked='true'] { background: var(--pandan); }
+.hours-switch[aria-checked='true']::after { left: 16px; background: var(--paper); }
+
+.hours-session,
+.hours-off,
+.hours-allday {
+  grid-column: 3;
+}
+
+.hours-session {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.hours-off,
+.hours-allday {
+  font-family: var(--font-data);
+  font-size: 12px;
+}
+
+.hours-off { color: var(--ink-soft); }
+.hours-allday { color: var(--pandan); font-weight: 600; }
+
+/* Times come from a quarter-hour list; the arrow is drawn so every browser shows the same pill. */
+.hours-time {
+  appearance: none;
+  border: 1.5px solid var(--ink);
+  border-radius: 8px;
+  background: var(--paper) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236b6257' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 6px center / 8px 5px;
+  color: var(--ink);
+  font-family: var(--font-data);
+  font-size: 12px;
+  padding: 4px 18px 4px 6px;
+  cursor: pointer;
+}
+
+.hours-more {
+  grid-column: 4;
+  appearance: none;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1;
+  padding: 3px 0 5px;
+  cursor: pointer;
+}
+
+.hours-more[aria-expanded='true'] {
+  background: var(--paper-dim);
+  color: var(--ink);
+}
+
+.hours-day .hours-remove {
+  grid-column: 4;
+}
+
+.hours-menu {
+  grid-column: 3 / -1;
+  display: flex;
+  flex-direction: column;
+  border: 1.5px solid var(--ink);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: 2px 2px 0 var(--ink);
+  overflow: hidden;
+}
+
+.hours-menu button {
+  appearance: none;
+  border: none;
+  border-top: 1px solid var(--paper-dim);
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 13px;
+  text-align: left;
+  padding: 8px 11px;
+  cursor: pointer;
+}
+
+.hours-menu button:first-child {
+  border-top: none;
+}
+
+@media (hover: hover) {
+  .hours-menu button:hover {
+    background: var(--paper-dim);
+  }
+}
+
+.hours-hint {
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  color: var(--monsoon);
+}
+
+.hours-remove,
+.hours-add {
+  appearance: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: var(--font-data);
+  color: var(--ink-soft);
+}
+
+.hours-remove {
+  font-size: 13px;
+  padding: 4px 6px;
+}
+
+.hours-add {
+  align-self: flex-start;
+  font-size: 11.5px;
+  padding: 2px 0;
+  text-decoration: underline;
+}
+
+.hours-switch:focus-visible,
+.hours-time:focus-visible,
+.hours-more:focus-visible,
+.hours-menu button:focus-visible,
+.hours-remove:focus-visible,
+.hours-add:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: 2px;
+}
+
+/* The menu clips its corners, so its ring sits inside. */
+.hours-menu button:focus-visible {
+  outline-offset: -3px;
+}
+
+.menu-price {
+  font-family: var(--font-data);
+  font-size: 14px;
+}
+
+/* Diners paid something else: a rubber stamp on the receipt, slightly askew. */
+.price-stamp {
+  border: 2.5px solid var(--chili);
+  border-radius: 6px;
+  color: var(--chili);
+  padding: 8px 10px;
+  font-size: 13px;
+  transform: rotate(-0.8deg);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.price-stamp strong {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 17px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.stamp-btn {
+  background: var(--paper);
+  border-color: var(--chili);
+  color: var(--chili);
+  box-shadow: 2px 2px 0 var(--chili);
+}
+
+.menu-actions,
+.menu-add {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.menu-add {
+  flex-wrap: wrap;
+  border-top: var(--line);
+  padding-top: 12px;
+}
+
+.menu-add .search-input:first-child {
+  flex: 1 1 100%;
+}
+
+.price-input {
+  width: 110px;
+  border: var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  font-family: var(--font-data);
+  font-size: 13px;
+  padding: 6px 8px;
+}
+
+.price-input:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: 2px;
+}
+
+/* ---------- edit-all price list ---------- */
+
+.price-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.price-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.price-table th {
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  text-align: left;
+  padding: 0 4px 6px;
+}
+
+.price-table td {
+  border-top: 1.5px dashed var(--ink-soft);
+  padding: 7px 4px;
+  vertical-align: middle;
+}
+
+.price-table .price-input {
+  width: 84px;
+}
+
+.price-table .search-input {
+  padding: 6px 8px;
+  font-size: 13.5px;
+}
+
+.price-table-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.price-table-now {
+  font-family: var(--font-data);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.price-table-remove {
+  text-align: center;
+  width: 1%;
+}
+
+.price-table-remove input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--chili);
+}
+
+.price-table tr.changed td,
+.price-table tr.adding td {
+  background: color-mix(in srgb, var(--kunyit) 22%, transparent);
+}
+
+.price-table tr.removing .price-table-name,
+.price-table tr.removing .price-table-now {
+  text-decoration: line-through;
+  color: var(--ink-soft);
+}
+
+/* ---------- menu photo ---------- */
+
+.menu-scan {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.menu-scan-hint {
+  font-family: var(--font-data);
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.menu-scan-busy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-data);
+  font-size: 12.5px;
+}
+
+.menu-scan-busy img,
+.scan-banner img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border: var(--line);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.scan-banner {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border-left: 4px solid var(--pandan);
+  background: var(--paper-dim);
+  padding: 8px 10px;
+}
+
+.scan-banner.sample {
+  border-left-color: var(--kunyit);
+}
+
+.scan-banner p {
+  margin: 0;
+  font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-choice[aria-checked='true'] {
+    transform: none;
+  }
+
+  .hours-switch::after {
+    transition: none;
+  }
+}
