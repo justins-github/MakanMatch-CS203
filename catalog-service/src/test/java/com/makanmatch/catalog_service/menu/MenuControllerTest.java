@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.makanmatch.catalog_service.common.ApiExceptionHandler;
 import com.makanmatch.catalog_service.config.SecurityConfig;
 import com.makanmatch.catalog_service.menu.dto.DishResponse;
+import com.makanmatch.catalog_service.menu.dto.VenuePriceResponse;
 import com.makanmatch.catalog_service.security.Caller;
 
 @WebMvcTest(MenuController.class)
@@ -99,6 +100,16 @@ class MenuControllerTest {
 				.contentType(MediaType.APPLICATION_JSON).content("{\"prices\":[{\"dishId\":\"d1\",\"price\":0}]}"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.errors['prices[0].price']").value("must be at least $0.10"));
+	}
+
+	@Test
+	void everyVenuesTypicalPriceIsPublic() throws Exception {
+		given(menus.typicalPrices()).willReturn(List.of(new VenuePriceResponse("turks-kebab", new java.math.BigDecimal("8.50"))));
+
+		mvc.perform(get("/api/catalog/venue-prices"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[0].venueId").value("turks-kebab"))
+				.andExpect(jsonPath("$[0].typicalPrice").value(8.50));
 	}
 
 	@Test

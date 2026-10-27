@@ -10,6 +10,7 @@
     "seed:personas": "node scripts/seed-accounts.mjs --personas",
     "upload:vectors": "node scripts/upload-venue-vectors.mjs",
     "simulate": "node scripts/seed-community.mjs",
+    "seed:changes": "node scripts/seed-changes.mjs",
     "postinstall": "cd demo && npm install"
   },
   "devDependencies": {

@@ -8,6 +8,7 @@ import { dirname, join } from 'path'
 import { config } from './config.js'
 import { createAccountClient } from './clients/accountClient.js'
 import { createAiClient } from './clients/aiClient.js'
+import { createChangeExplainer } from './changeExplainer.js'
 import { createCatalogClient } from './clients/catalogClient.js'
 import { migrate } from './db/migrate.js'
 import { openDatabase } from './db/pool.js'
@@ -61,7 +62,9 @@ console.log(ai.available ? `review reader: Claude (${ai.model})` : 'review reade
 
 const accounts = createAccountClient({ baseUrl: config.accountServiceUrl })
 const catalog = createCatalogClient({ baseUrl: config.catalogServiceUrl })
-const recommendations = createRecommendationService({ registry, vectors, learners, catalog, accounts })
+const recommendations = createRecommendationService({
+  registry, vectors, learners, catalog, accounts, explainer: createChangeExplainer({ ai }),
+})
 const reviews = createReviewService({ registry, learners, catalog, seedDishes, vectors, reader: createReviewReader({ ai }) })
 const profiles = createProfileService({ learners, summaries: createSummaryWriter({ ai }) })
 const authenticated = requireAuth({

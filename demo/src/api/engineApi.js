@@ -20,6 +20,10 @@ export function searchVenues(q, { limit = 8, signal } = {}) {
 
 export const getProfile = () => request('/api/profile')
 
+// Why your match with a venue changed since your last visit: { explanation: { text, writtenBy } | null }.
+export const getChangeExplanation = (venueId) =>
+  request(`/api/venues/${encodeURIComponent(venueId)}/change-explanation`)
+
 // "Claude's take" on your trends, and your answer to it (by the suggestion's signature).
 export const getSuggestion = () => request('/api/profile/suggestion')
 export const acceptSuggestion = (signature) =>
