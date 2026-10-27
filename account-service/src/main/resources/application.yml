@@ -1,0 +1,47 @@
+# Secrets come from environment variables, or from the repo-root .env when run
+# locally (imported below). See .env.example at the repo root.
+spring:
+  application:
+    name: account-service
+  config:
+    import: "optional:file:.env[.properties],optional:file:../.env[.properties]"
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME:postgres}?sslmode=${DB_SSLMODE:require}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      # Supabase's free session pooler allows few clients; three services share it.
+      maximum-pool-size: ${DB_POOL_SIZE:3}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: accounts
+  flyway:
+    schemas: accounts
+    default-schema: accounts
+    create-schemas: true
+
+server:
+  port: ${ACCOUNT_SERVICE_PORT:8082}
+  forward-headers-strategy: framework
+
+supabase:
+  url: ${SUPABASE_URL}
+  publishable-key: ${SUPABASE_PUBLISHABLE_KEY}
+  secret-key: ${SUPABASE_SECRET_KEY}
+  # Only for projects still on the legacy shared JWT secret; leave empty to verify
+  # tokens against the project's public signing keys (JWKS).
+  jwt-secret: ${SUPABASE_JWT_SECRET:}
+
+auth:
+  # false only for http://localhost; must be true anywhere served over https.
+  cookie-secure: ${COOKIE_SECURE:false}
+  login-attempts-per-window: 10
+  login-window: 5m
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
