@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getProfile } from '../api/engineApi.js'
+import { acceptSuggestion, dismissSuggestion, getProfile, getSuggestion } from '../api/engineApi.js'
 
 function RadarChart({ dimensions }) {
   const width = 360
@@ -155,6 +155,89 @@ function HistoryChart({ history }) {
   )
 }
 
+const signed = (step) => `${step > 0 ? '+' : '−'}${Math.abs(step).toFixed(2)}`
+
+// "Claude's take" on the trends (CSD-56): nothing changes until you lean into it,
+// and an answered suggestion doesn't come back.
+function TheirTake({ onAnswered }) {
+  const [suggestion, setSuggestion] = useState(undefined) // undefined = still loading
+  const [answer, setAnswer] = useState(null) // { decision, applied } once answered
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    getSuggestion().then((r) => setSuggestion(r.suggestion)).catch(() => setSuggestion(null))
+  }, [])
+
+  const answerWith = async (send) => {
+    setBusy(true)
+    setError(null)
+    try {
+      setAnswer(await send(suggestion.signature))
+      onAnswered()
+    } catch (err) {
+      setError(err.status === 409 ? 'That suggestion changed - reopen this page to see the new one.' : err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (answer?.decision === 'accepted') {
+    const moved = answer.applied.map((c) => `${c.label} ${c.from.toFixed(2)} → ${c.to.toFixed(2)}`).join(', ')
+    return <div className="take take-done">Done: {moved}. Your matches now lean that way.</div>
+  }
+  if (answer?.decision === 'dismissed') {
+    return <div className="take take-done">Got it, nothing changed. We won't suggest this again.</div>
+  }
+  if (!suggestion) return null
+
+  return (
+    <div className="take">
+      <div className="lately-label">{suggestion.writtenBy === 'ai' ? "Claude's take" : 'In short'}</div>
+      <p className="take-summary">{suggestion.summary}</p>
+      <div className="take-buttons">
+        <button className="take-yes" disabled={busy} onClick={() => answerWith(acceptSuggestion)}>
+          Lean into it
+        </button>
+        <button className="take-no" disabled={busy} onClick={() => answerWith(dismissSuggestion)}>
+          No thanks
+        </button>
+      </div>
+      <div className="take-changes">
+        {suggestion.changes.map((c) => `${c.label} ${signed(c.step)}`).join(', ')} if you accept
+      </div>
+      {error && <div className="error">{error}</div>}
+    </div>
+  )
+}
+
+// Dimensions moving steadily one way over your recent reviews (CSD-55).
+function Lately({ trends, onAnswered }) {
+  return (
+    <section className="lately" aria-labelledby="lately-title">
+      <div id="lately-title" className="lately-label">Lately</div>
+      {trends.length === 0 ? (
+        <p className="lately-empty">
+          Nothing steady yet. Once a few reviews in a row push the same way, it shows up here.
+        </p>
+      ) : (
+        trends.map((t) => (
+          <div key={t.key} className="lately-trend">
+            <span className={`delta-arrow ${t.direction}`}>{t.direction === 'up' ? '▲' : '▼'}</span>
+            <span>
+              <span className="lately-headline">{t.headline}</span>
+              <span className="lately-vals">
+                {t.label} {t.from.toFixed(2)} → {t.to.toFixed(2)} over your last {t.reviews} reviews
+              </span>
+            </span>
+          </div>
+        ))
+      )}
+      {trends.length > 0 && <TheirTake onAnswered={onAnswered} />}
+    </section>
+  )
+}
+
 export default function TasteDna() {
   const [profile, setProfile] = useState(null)
   const [error, setError] = useState(null)
@@ -179,6 +262,8 @@ export default function TasteDna() {
       <div className="radar-wrap">
         <RadarChart dimensions={profile.dimensions} />
       </div>
+
+      <Lately trends={profile.trends ?? []} onAnswered={() => getProfile().then(setProfile).catch(() => {})} />
 
       <section className="dna-history" aria-labelledby="dna-history-title">
         <h3 id="dna-history-title">How it's changed</h3>

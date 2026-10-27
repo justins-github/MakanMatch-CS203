@@ -574,6 +574,108 @@ body {
   justify-content: center;
 }
 
+.lately {
+  margin: 4px 0 16px;
+  padding: 10px 12px;
+  border: var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.lately-label {
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.lately-trend {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 7px;
+  font-size: 13px;
+}
+
+.lately-headline {
+  display: block;
+  font-weight: 600;
+}
+
+.lately-vals {
+  display: block;
+  font-family: var(--font-data);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+
+.take {
+  margin-top: 10px;
+  border-top: 1px dashed var(--ink-soft);
+  padding-top: 9px;
+}
+
+.take-summary {
+  margin: 4px 0 8px;
+  font-size: 13px;
+}
+
+.take-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.take-yes,
+.take-no {
+  appearance: none;
+  border: var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 12.5px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.take-yes { background: var(--kunyit); }
+.take-no { background: var(--paper); }
+
+.take-yes:disabled,
+.take-no:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.take-yes:focus-visible,
+.take-no:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: 2px;
+}
+
+.take-changes {
+  margin-top: 6px;
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  color: var(--ink-soft);
+}
+
+.take-done {
+  font-size: 12.5px;
+  background: var(--paper-dim);
+  border-radius: 6px;
+  padding: 7px 8px;
+  border-top: none;
+}
+
+.lately-empty {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
 .dna-history {
   margin-top: 4px;
   padding: 12px 10px 10px;
@@ -767,8 +869,6 @@ body {
   margin: 3px 0 7px;
 }
 
-<<<<<<< Updated upstream
-=======
 .delta-reader {
   font-family: var(--font-data);
   font-size: 10.5px;
@@ -777,7 +877,6 @@ body {
   margin-top: 2px;
 }
 
->>>>>>> Stashed changes
 .delta-row {
   display: flex;
   align-items: baseline;
@@ -804,8 +903,6 @@ body {
   font-size: 11.5px;
 }
 
-<<<<<<< Updated upstream
-=======
 .delta-panel.undone {
   border-color: var(--ink-soft);
   box-shadow: 3px 3px 0 var(--ink-soft);
@@ -860,7 +957,6 @@ body {
   outline-offset: 2px;
 }
 
->>>>>>> Stashed changes
 .teach-btn {
   margin-top: 10px;
   appearance: none;

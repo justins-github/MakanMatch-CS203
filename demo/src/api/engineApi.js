@@ -20,6 +20,13 @@ export function searchVenues(q, { limit = 8, signal } = {}) {
 
 export const getProfile = () => request('/api/profile')
 
+// "Claude's take" on your trends, and your answer to it (by the suggestion's signature).
+export const getSuggestion = () => request('/api/profile/suggestion')
+export const acceptSuggestion = (signature) =>
+  request('/api/profile/suggestion/accept', { method: 'POST', body: { signature } })
+export const dismissSuggestion = (signature) =>
+  request('/api/profile/suggestion/dismiss', { method: 'POST', body: { signature } })
+
 // A venue's dishes with the AI's prediction for you (adding dishes goes to the catalog).
 export const getVenueDishes = (venueId) => request(`/api/dishes?venueId=${encodeURIComponent(venueId)}`)
 
@@ -28,11 +35,8 @@ export const getRankings = () => request('/api/rankings')
 export const postBeliReview = (dishId, sentiment, insertIndex, duels, text) =>
   request('/api/reviews/beli', { method: 'POST', body: { dishId, sentiment, insertIndex, duels, text } })
 
-<<<<<<< Updated upstream
-=======
 // Takes back the Taste DNA change from the review you just posted (the review stays).
 export const undoReview = (dishId, at) => request('/api/reviews/undo', { method: 'POST', body: { dishId, at } })
 
->>>>>>> Stashed changes
 // Forgets everything you taught the AI (only yours).
 export const postReset = () => request('/api/reset', { method: 'POST' })
