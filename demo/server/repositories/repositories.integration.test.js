@@ -8,6 +8,7 @@ import { rankingRepository } from './rankingRepository.js'
 import { reviewRepository } from './reviewRepository.js'
 import { tasteProfileHistoryRepository } from './tasteProfileHistoryRepository.js'
 import { tasteProfileRepository } from './tasteProfileRepository.js'
+import { trendDecisionRepository } from './trendDecisionRepository.js'
 import { venueEmbeddingRepository } from './venueEmbeddingRepository.js'
 
 const USER = '77777777-7777-7777-7777-777777777777'
@@ -31,11 +32,9 @@ test('migrations apply once and are recorded', async () => {
     '003_create_taste_profiles.sql',
     '004_create_venue_embeddings.sql',
     '005_create_taste_profile_history.sql',
-<<<<<<< Updated upstream
-=======
     '006_add_review_signals.sql',
     '007_add_review_undo.sql',
->>>>>>> Stashed changes
+    '008_create_trend_decisions.sql',
   ])
   assert.deepEqual(await migrate(db), [])
 })
@@ -57,8 +56,6 @@ test('reviews round-trip in the shape learn.js uses', async () => {
   assert.equal(rated.sentiment, undefined, 'star reviews have no sentiment')
   assert.equal(rated.score10, undefined, 'star reviews have no 1-10 score')
   assert.deepEqual(rated.tags, ['worth-it'])
-<<<<<<< Updated upstream
-=======
   assert.equal(rated.signals, undefined, 'reviews saved without a reading have no signals')
   assert.equal(rated.readBy, undefined)
 })
@@ -75,21 +72,34 @@ test('a review keeps what was read from its text', async () => {
   assert.equal(read.readBy, 'ai')
 })
 
-test('only the latest review brings back the profile before it, and undo marks it', async () => {
+test('the last 8 reviews bring back the profile before them, and undo marks only the latest', async () => {
   const reviews = reviewRepository(db)
   const someone = '78787878-7878-7878-7878-787878787878'
   const base = { dishName: 'Dish', venueId: 'turks-kebab', rating: 5, sentiment: 'loved', tags: [], text: '', predicted: 50, actual: 80 }
-  await reviews.insert(someone, { ...base, dishId: 'd-1', profileBefore: { spicePref: 0.5 }, at: '2026-09-04T10:00:00.000Z' })
-  await reviews.insert(someone, { ...base, dishId: 'd-2', profileBefore: { spicePref: 0.6 }, at: '2026-09-05T10:00:00.000Z' })
-  let [older, latest] = await reviews.listForUser(someone)
-  assert.equal(older.profileBefore, undefined, 'only the latest review can be undone, so only it needs this')
-  assert.deepEqual(latest.profileBefore, { spicePref: 0.6 })
-  assert.equal(latest.undone, undefined)
+  for (let day = 1; day <= 9; day++) {
+    const at = `2026-09-${String(day).padStart(2, '0')}T10:00:00.000Z`
+    await reviews.insert(someone, { ...base, dishId: `d-${day}`, profileBefore: { spicePref: day / 10 }, at })
+  }
+  let listed = await reviews.listForUser(someone)
+  assert.equal(listed[0].profileBefore, undefined, 'older reviews are needed by neither undo nor trends')
+  assert.deepEqual(listed.slice(1).map((r) => r.profileBefore.spicePref), [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
+  assert.equal(listed.at(-1).undone, undefined)
   await reviews.markLatestUndone(someone)
-  ;[older, latest] = await reviews.listForUser(someone)
-  assert.equal(latest.undone, true)
-  assert.equal(older.undone, undefined)
->>>>>>> Stashed changes
+  listed = await reviews.listForUser(someone)
+  assert.equal(listed.at(-1).undone, true)
+  assert.equal(listed.at(-2).undone, undefined)
+})
+
+test('trend decisions are kept once each and forgotten on reset', async () => {
+  const decisions = trendDecisionRepository(db)
+  await decisions.insert(USER, [{ key: 'spice', direction: 'up', decision: 'accepted' }, { key: 'cuisine:thai', direction: 'down', decision: 'dismissed' }])
+  await decisions.insert(USER, [{ key: 'spice', direction: 'up', decision: 'dismissed' }])
+  assert.deepEqual(await decisions.list(USER), [
+    { key: 'cuisine:thai', direction: 'down', decision: 'dismissed' },
+    { key: 'spice', direction: 'up', decision: 'accepted' },
+  ])
+  await decisions.deleteForUser(USER)
+  assert.deepEqual(await decisions.list(USER), [])
 })
 
 test('rankings keep their order when replaced', async () => {

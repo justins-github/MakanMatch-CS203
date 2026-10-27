@@ -1,16 +1,11 @@
-// Loads and saves each user's learning state: { profile, reviews, rankings }.
+// Loads and saves each user's learning state: { profile, reviews, rankings, decisions }.
 //   memoryLearnerStore - no database; kept in this process, lost on restart
 //   dbLearnerStore     - Postgres (taste schema); survives restarts
 // Same interface for both:
 //   read(userId, name)            a copy of the user's state (a new user gets starter(name))
-<<<<<<< Updated upstream
-//   update(userId, name, change)  runs change(state) -> { result, review?, tasteVector? },
-//                                 saves the state, returns result
-=======
-//   update(userId, name, change)  runs change(state) -> { result, review?, tasteVector?, undone? },
+//   update(userId, name, change)  runs change(state) -> { result, review?, tasteVector?, undone?, decided? },
 //                                 saves the state, returns result (undone = the latest
-//                                 review was just undone)
->>>>>>> Stashed changes
+//                                 review was just undone; decided = new trend decisions)
 //   reset(userId)                 forgets everything the user taught the AI
 // Updates for one user run one at a time, so two quick reviews can't overwrite
 // each other's profile changes.
@@ -19,6 +14,7 @@ import { rankingRepository } from '../repositories/rankingRepository.js'
 import { reviewRepository } from '../repositories/reviewRepository.js'
 import { tasteProfileHistoryRepository } from '../repositories/tasteProfileHistoryRepository.js'
 import { tasteProfileRepository } from '../repositories/tasteProfileRepository.js'
+import { trendDecisionRepository } from '../repositories/trendDecisionRepository.js'
 
 const HISTORY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
 
@@ -78,12 +74,13 @@ export function memoryLearnerStore({ starter }) {
 export function dbLearnerStore({ db, starter }) {
   const oneAtATime = perUserQueue()
   async function read(userId, name) {
-    const [profile, reviews, rankings] = await Promise.all([
+    const [profile, reviews, rankings, decisions] = await Promise.all([
       tasteProfileRepository(db).get(userId),
       reviewRepository(db).listForUser(userId),
       rankingRepository(db).get(userId),
+      trendDecisionRepository(db).list(userId),
     ])
-    return { profile: profile ?? starter(name), reviews, rankings }
+    return { profile: profile ?? starter(name), reviews, rankings, decisions }
   }
   async function history(userId) {
     return tasteProfileHistoryRepository(db).listRecent(userId)
@@ -96,19 +93,13 @@ export function dbLearnerStore({ db, starter }) {
       return oneAtATime(userId, async () => {
         const state = await read(userId, name)
         const previousProfile = structuredClone(state.profile)
-<<<<<<< Updated upstream
-        const { result, review, tasteVector } = await change(state)
-=======
-        const { result, review, tasteVector, undone } = await change(state)
->>>>>>> Stashed changes
+        const { result, review, tasteVector, undone, decided } = await change(state)
         await db.tx(async (tx) => {
           await tasteProfileRepository(tx).save(userId, state.profile)
           await rankingRepository(tx).replace(userId, state.rankings)
           if (review) await reviewRepository(tx).insert(userId, review)
-<<<<<<< Updated upstream
-=======
           if (undone) await reviewRepository(tx).markLatestUndone(userId)
->>>>>>> Stashed changes
+          if (decided?.length) await trendDecisionRepository(tx).insert(userId, decided)
           if (tasteVector !== undefined) await tasteProfileRepository(tx).saveVector(userId, tasteVector)
           if (profileChanged(previousProfile, state.profile)) {
             await tasteProfileHistoryRepository(tx).saveSnapshot(userId, state.profile)
@@ -124,6 +115,7 @@ export function dbLearnerStore({ db, starter }) {
           await rankingRepository(tx).deleteForUser(userId)
           await tasteProfileRepository(tx).deleteForUser(userId)
           await tasteProfileHistoryRepository(tx).deleteForUser(userId)
+          await trendDecisionRepository(tx).deleteForUser(userId)
         }),
       )
     },

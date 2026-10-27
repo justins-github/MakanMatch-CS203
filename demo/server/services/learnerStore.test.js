@@ -2,11 +2,7 @@
 // against each: in memory, and on a real (embedded) Postgres.
 import test from 'node:test'
 import assert from 'node:assert/strict'
-<<<<<<< Updated upstream
-import { applyBeliReview, starterProfile } from '../learn.js'
-=======
 import { applyBeliReview, starterProfile, undoLatestReview } from '../learn.js'
->>>>>>> Stashed changes
 import { migrate } from '../db/migrate.js'
 import { openDatabase } from '../db/pool.js'
 import { dbLearnerStore, memoryLearnerStore } from './learnerStore.js'
@@ -91,8 +87,6 @@ for (const [kind, makeStore] of Object.entries(stores)) {
     assert.deepEqual((await store.read(ALICE, 'Alice')).reviews, [])
   })
 
-<<<<<<< Updated upstream
-=======
   test(`${kind}: undoing the latest review restores the profile and keeps the review`, async () => {
     const store = makeStore()
     await store.reset(ALICE)
@@ -112,7 +106,20 @@ for (const [kind, makeStore] of Object.entries(stores)) {
     assert.equal(await undo(), null, 'a second undo is refused')
   })
 
->>>>>>> Stashed changes
+  test(`${kind}: accept and dismiss choices are kept, and reset forgets them`, async () => {
+    const store = makeStore()
+    await store.reset(ALICE)
+    assert.deepEqual((await store.read(ALICE, 'Alice')).decisions, [])
+    const decided = [{ key: 'spice', direction: 'up', decision: 'dismissed' }]
+    await store.update(ALICE, 'Alice', async (state) => {
+      state.decisions.push(...decided)
+      return { result: true, decided }
+    })
+    assert.deepEqual((await store.read(ALICE, 'Alice')).decisions, decided)
+    await store.reset(ALICE)
+    assert.deepEqual((await store.read(ALICE, 'Alice')).decisions, [])
+  })
+
   test(`${kind}: reset forgets only that user`, async () => {
     const store = makeStore()
     await review(store, ALICE, 'kebab-1')
