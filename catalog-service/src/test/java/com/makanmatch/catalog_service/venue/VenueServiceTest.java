@@ -8,6 +8,7 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -102,6 +103,22 @@ class VenueServiceTest {
 	@Test
 	void searchNeedsTwoCharacters() {
 		assertThatThrownBy(() -> service.search("k", 10)).isInstanceOf(BadRequestException.class);
+	}
+
+	@Test
+	void updatesSinceAVisitAreTheNewerOnesOldestFirst() {
+		givenVenue("turks-kebab");
+		Instant visit = Instant.parse("2026-10-10T00:00:00Z");
+		VenueUpdate before = new VenueUpdate("turks-kebab", VenueStatus.OPEN, null, null, "New menu", null,
+				visit.minusSeconds(3600));
+		VenueUpdate closed = new VenueUpdate("turks-kebab", VenueStatus.TEMPORARILY_CLOSED, null, null, "Renovating", null,
+				visit.plusSeconds(3600));
+		VenueUpdate moved = new VenueUpdate("turks-kebab", VenueStatus.MOVED, "35 Selegie Rd #01-C2", null, null, null,
+				visit.plusSeconds(7200));
+		given(updates.findByVenueIdOrderByCreatedAtDesc("turks-kebab")).willReturn(List.of(moved, closed, before));
+
+		assertThat(service.updatesSince("turks-kebab", visit)).extracting(VenueUpdateResponse::status)
+				.containsExactly(VenueStatus.TEMPORARILY_CLOSED, VenueStatus.MOVED);
 	}
 
 	private void givenVenue(String id) {

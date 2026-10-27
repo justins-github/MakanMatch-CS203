@@ -45,6 +45,11 @@ public class VenueUpdate {
 
 	public VenueUpdate(String venueId, VenueStatus status, String newAddress, String openingHours, String note,
 			UUID reportedBy) {
+		this(venueId, status, newAddress, openingHours, note, reportedBy, Instant.now());
+	}
+
+	VenueUpdate(String venueId, VenueStatus status, String newAddress, String openingHours, String note,
+			UUID reportedBy, Instant createdAt) {
 		this.id = UUID.randomUUID();
 		this.venueId = venueId;
 		this.status = status;
@@ -52,7 +57,7 @@ public class VenueUpdate {
 		this.openingHours = openingHours;
 		this.note = note;
 		this.reportedBy = reportedBy;
-		this.createdAt = Instant.now();
+		this.createdAt = createdAt;
 	}
 
 	public UUID getId() {

@@ -367,6 +367,7 @@ cd context-service && ./mvnw test
 | `npm run seed:menus` | Add the curated demo dishes and prices |
 | `npm run upload:vectors` | Upload venue embeddings to pgvector |
 | `npm run seed:personas` / `npm run simulate` | Create the demo community and play a week of activity |
+| `npm run seed:changes` | Mei reviews Turk's Kebab, then its owner changes prices and the menu, so her card shows "Since your last visit" (run after `seed:personas`) |
 | `node scripts/extract-overture.mjs` | Re-extract Singapore venues from the latest monthly Overture Maps release, then run `load:venues` |
 | `node scripts/embed-venues.mjs` | Rebuild the venue embeddings |
 | `node scripts/seed-accounts.mjs --promote <email>` | Make an account an admin |

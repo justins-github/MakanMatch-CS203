@@ -1621,6 +1621,75 @@ body {
   background: var(--ink-soft);
 }
 
+/* CSD-50: what changed at a place you've reviewed since your last visit. */
+.since-visit {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1.5px dashed var(--monsoon);
+  border-radius: 8px;
+  background: var(--monsoon-wash);
+}
+
+.since-visit-label {
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--monsoon);
+}
+
+.since-visit-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 5px;
+  font-size: 12.5px;
+}
+
+.since-visit-tag {
+  flex: none;
+  font-family: var(--font-data);
+  font-size: 10px;
+  text-transform: uppercase;
+  padding: 0 5px;
+  border: 1px solid var(--ink-soft);
+  border-radius: 4px;
+  color: var(--ink-soft);
+}
+
+.since-visit-match {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.since-visit-why {
+  margin-top: 4px;
+  font-size: 12.5px;
+}
+
+.since-visit-who {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-data);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.since-visit-match.up { color: var(--pandan); }
+.since-visit-match.down { color: var(--chili); }
+
+.since-visit .pricier { color: var(--chili); font-weight: 600; }
+.since-visit .cheaper { color: var(--pandan); font-weight: 600; }
+
+.since-visit-quiet {
+  margin-top: 5px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
 .owner-update-label {
   display: block;
   font-family: var(--font-data);

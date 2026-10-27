@@ -33,6 +33,10 @@ public class Dish {
 	@Column(name = "archived", nullable = false)
 	private boolean archived;
 
+	/** When it came off the menu; null while it's on it. */
+	@Column(name = "archived_at")
+	private Instant archivedAt;
+
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private Instant createdAt;
 
@@ -40,12 +44,16 @@ public class Dish {
 	}
 
 	public Dish(String venueId, String name, ReportSource source, UUID createdBy) {
+		this(venueId, name, source, createdBy, Instant.now());
+	}
+
+	Dish(String venueId, String name, ReportSource source, UUID createdBy, Instant createdAt) {
 		this.id = UUID.randomUUID().toString();
 		this.venueId = venueId;
 		this.name = name;
 		this.source = source;
 		this.createdBy = createdBy;
-		this.createdAt = Instant.now();
+		this.createdAt = createdAt;
 	}
 
 	public void rename(String name) {
@@ -53,6 +61,13 @@ public class Dish {
 	}
 
 	public void setArchived(boolean archived) {
+		setArchived(archived, Instant.now());
+	}
+
+	/** Archiving records when; archiving again keeps the first time; un-archiving clears it. */
+	void setArchived(boolean archived, Instant at) {
+		if (archived && !this.archived) this.archivedAt = at;
+		if (!archived) this.archivedAt = null;
 		this.archived = archived;
 	}
 
@@ -83,6 +98,10 @@ public class Dish {
 
 	public boolean isArchived() {
 		return archived;
+	}
+
+	public Instant getArchivedAt() {
+		return archivedAt;
 	}
 
 	public Instant getCreatedAt() {
