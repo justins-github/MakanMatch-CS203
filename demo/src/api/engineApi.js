@@ -28,5 +28,11 @@ export const getRankings = () => request('/api/rankings')
 export const postBeliReview = (dishId, sentiment, insertIndex, duels, text) =>
   request('/api/reviews/beli', { method: 'POST', body: { dishId, sentiment, insertIndex, duels, text } })
 
+<<<<<<< Updated upstream
+=======
+// Takes back the Taste DNA change from the review you just posted (the review stays).
+export const undoReview = (dishId, at) => request('/api/reviews/undo', { method: 'POST', body: { dishId, at } })
+
+>>>>>>> Stashed changes
 // Forgets everything you taught the AI (only yours).
 export const postReset = () => request('/api/reset', { method: 'POST' })

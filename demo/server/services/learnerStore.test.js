@@ -2,7 +2,11 @@
 // against each: in memory, and on a real (embedded) Postgres.
 import test from 'node:test'
 import assert from 'node:assert/strict'
+<<<<<<< Updated upstream
 import { applyBeliReview, starterProfile } from '../learn.js'
+=======
+import { applyBeliReview, starterProfile, undoLatestReview } from '../learn.js'
+>>>>>>> Stashed changes
 import { migrate } from '../db/migrate.js'
 import { openDatabase } from '../db/pool.js'
 import { dbLearnerStore, memoryLearnerStore } from './learnerStore.js'
@@ -87,6 +91,28 @@ for (const [kind, makeStore] of Object.entries(stores)) {
     assert.deepEqual((await store.read(ALICE, 'Alice')).reviews, [])
   })
 
+<<<<<<< Updated upstream
+=======
+  test(`${kind}: undoing the latest review restores the profile and keeps the review`, async () => {
+    const store = makeStore()
+    await store.reset(ALICE)
+    await review(store, ALICE, 'kebab-1')
+    const before = (await store.read(ALICE, 'Alice')).profile
+    const posted = await review(store, ALICE, 'kebab-2', { insertIndex: 1, text: 'love the spice' })
+    const undo = () => store.update(ALICE, 'Alice', async (state) => {
+      const result = undoLatestReview(state, { dishId: posted.review.dishId, at: posted.review.at })
+      return { result, undone: Boolean(result) }
+    })
+    assert.ok(await undo())
+    const state = await store.read(ALICE, 'Alice')
+    assert.deepEqual(state.profile, before)
+    assert.equal(state.reviews.length, 2)
+    assert.equal(state.reviews[1].undone, true)
+    assert.deepEqual(state.rankings, ['kebab-1', 'kebab-2'])
+    assert.equal(await undo(), null, 'a second undo is refused')
+  })
+
+>>>>>>> Stashed changes
   test(`${kind}: reset forgets only that user`, async () => {
     const store = makeStore()
     await review(store, ALICE, 'kebab-1')

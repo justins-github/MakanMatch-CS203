@@ -1,4 +1,9 @@
+<<<<<<< Updated upstream
 // Lexicon of taste signals in review text; evidence counts scale the learner's nudges.
+=======
+// Lexicon of taste signals in review text: the fallback reader when Claude is off
+// (reviewReader.js), and how reviews saved before AI reading count as evidence.
+>>>>>>> Stashed changes
 
 export const SIGNALS = [
   {
@@ -52,6 +57,7 @@ export const SIGNALS = [
   },
 ]
 
+<<<<<<< Updated upstream
 // Signals present in one review text.
 export function matchSignals(text) {
   if (!text) return []
@@ -61,4 +67,20 @@ export function matchSignals(text) {
 // Counts corpus texts carrying this signal.
 export function countEvidence(corpusTexts, signal) {
   return corpusTexts.filter((t) => t && signal.re.test(t)).length
+=======
+const DIMENSION = { spice: 'spice', richness: 'richness', price: 'price', adventure: 'adventurousness' }
+
+// One review text read by the lexicon, in the reader's shape (see reviewReader.js).
+// It can't tell why you felt something, so blame is always "overall".
+export function keywordReading(text) {
+  if (!text?.trim()) return { readBy: null, blame: 'overall', signals: [] }
+  const signals = SIGNALS.filter((s) => s.re.test(text)).map((s) => ({
+    dimension: DIMENSION[s.dim],
+    direction: s.dir > 0 ? 'up' : 'down',
+    strength: 2,
+    quote: text.match(s.re)[0],
+    why: s.label,
+  }))
+  return { readBy: 'keywords', blame: 'overall', signals }
+>>>>>>> Stashed changes
 }

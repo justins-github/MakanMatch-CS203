@@ -2,7 +2,11 @@
 // user's rankings, and posting reviews (which retrain their Taste DNA).
 // Dishes and prices belong to catalog-service; this service keeps the taste
 // features the AI needs (curated for seed dishes, neutral for everything else).
+<<<<<<< Updated upstream
 import { badRequest, forbidden, notFound } from '../errors.js'
+=======
+import { badRequest, conflict, forbidden, notFound } from '../errors.js'
+>>>>>>> Stashed changes
 import {
   REVIEW_TAGS,
   SENTIMENTS,
@@ -11,13 +15,24 @@ import {
   getAccuracy,
   predictDishScore,
   priceTierFor,
+<<<<<<< Updated upstream
 } from '../learn.js'
+=======
+  undoLatestReview,
+} from '../learn.js'
+import { createReviewReader } from '../reviewReader.js'
+>>>>>>> Stashed changes
 import { learnedVector } from './tasteVectors.js'
 
 const round1 = (v) => Math.round(v * 10) / 10
 const numberOrNull = (v) => (v == null || v === '' ? null : Number(v))
 
+<<<<<<< Updated upstream
 export function createReviewService({ registry, learners, catalog, seedDishes, vectors }) {
+=======
+// `reader` reads review text (reviewReader.js); without one, keywords do it.
+export function createReviewService({ registry, learners, catalog, seedDishes, vectors, reader = createReviewReader({ ai: null }) }) {
+>>>>>>> Stashed changes
   const seedById = new Map(seedDishes.map((d) => [d.id, d]))
   const seedAsCatalogDish = (s) => ({ id: s.id, venueId: s.venueId, name: s.name, price: s.price, source: 'SEED' })
 
@@ -161,6 +176,14 @@ export function createReviewService({ registry, learners, catalog, seedDishes, v
       const venue = venueOf(dish)
       assertMayReview(user, dish)
 
+<<<<<<< Updated upstream
+=======
+      // Read the text before taking the learning lock, so a slow AI answer
+      // doesn't hold up this user's other writes.
+      const { profile } = await learners.read(user.id, user.me.displayName)
+      const reading = await reader.read({ text, dish, venue, sentiment, profile })
+
+>>>>>>> Stashed changes
       return learn(user, async (state) => {
         const opponentIds = [...new Set(duels.flatMap((d) => [d?.winnerId, d?.loserId]))].filter((id) => id && id !== dish.id)
         const known = await findRankedDishes(state, opponentIds)
@@ -171,7 +194,24 @@ export function createReviewService({ registry, learners, catalog, seedDishes, v
           if (!winner || !loser) throw badRequest('duel references an unknown dish')
           return { winner: withCuisine(winner), loser: withCuisine(loser) }
         })
+<<<<<<< Updated upstream
         return applyBeliReview(state, dish, venue, { sentiment, duels: resolved, insertIndex, text })
+=======
+        return applyBeliReview(state, dish, venue, { sentiment, duels: resolved, insertIndex, text, reading })
+      })
+    },
+
+    // Undo (CSD-54): takes back what the AI learned from the review just posted,
+    // named by its dish and time so a stale screen can't undo a newer review.
+    // The review, its score and the ranking stay.
+    async undoLatest(user, body) {
+      const { dishId, at } = body ?? {}
+      if (typeof dishId !== 'string' || typeof at !== 'string') throw badRequest('dishId and at are required')
+      return learners.update(user.id, user.me.displayName, async (state) => {
+        const result = undoLatestReview(state, { dishId, at })
+        if (!result) throw conflict("That's no longer your latest review, or it was already undone")
+        return { result: { undone: true, profile: result.profile, accuracy: result.accuracy }, undone: true }
+>>>>>>> Stashed changes
       })
     },
 

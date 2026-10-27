@@ -22,6 +22,14 @@ export function reviewRoutes({ reviews }) {
     res.json(await reviews.submitBeli(req.user, req.body))
   }))
 
+<<<<<<< Updated upstream
+=======
+  // Undo the Taste DNA change from the review just posted: { dishId, at }.
+  router.post('/api/reviews/undo', asyncHandler(async (req, res) => {
+    res.json(await reviews.undoLatest(req.user, req.body))
+  }))
+
+>>>>>>> Stashed changes
   // Star-rating review (the app uses /api/reviews/beli).
   router.post('/api/reviews', asyncHandler(async (req, res) => {
     res.json(await reviews.submitRating(req.user, req.body))
