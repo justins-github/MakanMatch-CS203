@@ -5,11 +5,13 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -24,8 +26,12 @@ import com.makanmatch.catalog_service.menu.dto.DishResponse;
 import com.makanmatch.catalog_service.menu.dto.DishUpdateRequest;
 import com.makanmatch.catalog_service.menu.dto.MenuChangesRequest;
 import com.makanmatch.catalog_service.menu.dto.MenuChangesRequest.PriceChange;
+import com.makanmatch.catalog_service.menu.dto.MenuChangesSince;
+import com.makanmatch.catalog_service.menu.dto.MenuChangesSince.ChangedDish;
+import com.makanmatch.catalog_service.menu.dto.MenuChangesSince.RepricedDish;
 import com.makanmatch.catalog_service.menu.dto.PricePointResponse;
 import com.makanmatch.catalog_service.menu.dto.PriceReportRequest;
+import com.makanmatch.catalog_service.menu.dto.VenuePriceResponse;
 import com.makanmatch.catalog_service.security.Caller;
 import com.makanmatch.catalog_service.security.VenueAccessPolicy;
 import com.makanmatch.catalog_service.security.VenueAccessPolicy.Access;
@@ -73,6 +79,77 @@ public class MenuService {
 	public List<DishResponse> getMany(Collection<String> dishIds) {
 		if (dishIds.size() > MAX_BATCH) throw new BadRequestException("At most " + MAX_BATCH + " dishes per request");
 		return withPrices(dishes.findAllById(dishIds));
+	}
+
+	/**
+	 * What changed on a venue's menu since a moment (CSD-50). A dish that was both
+	 * added and taken off since then isn't listed; dishes archived before archived_at
+	 * existed have no removal date, so they never count as removed.
+	 */
+	@Transactional(readOnly = true)
+	public MenuChangesSince changesSince(String venueId, Instant since) {
+		venues.requireExists(venueId);
+		List<Dish> all = dishes.findByVenueIdOrderByNameAsc(venueId);
+		Map<String, List<DishPrice>> byDish = pricesByDish(all);
+		List<RepricedDish> repriced = new ArrayList<>();
+		List<ChangedDish> added = new ArrayList<>();
+		List<ChangedDish> removed = new ArrayList<>();
+		List<BigDecimal> pricesThen = new ArrayList<>();
+		List<BigDecimal> pricesNow = new ArrayList<>();
+		for (Dish dish : all) {
+			List<DishPrice> history = byDish.getOrDefault(dish.getId(), List.of());
+			boolean isNew = dish.getCreatedAt().isAfter(since);
+			boolean goneSince = dish.isArchived() && dish.getArchivedAt() != null && dish.getArchivedAt().isAfter(since);
+			if (!dish.isArchived()) addIfPriced(pricesNow, summarize(dish, history).price());
+			if (!isNew && (!dish.isArchived() || goneSince)) addIfPriced(pricesThen, shownPriceAt(dish, history, since));
+			if (isNew && !dish.isArchived()) {
+				added.add(new ChangedDish(dish.getId(), dish.getName(), summarize(dish, history).price(), dish.getCreatedAt()));
+			} else if (goneSince && !isNew) {
+				removed.add(new ChangedDish(dish.getId(), dish.getName(), null, dish.getArchivedAt()));
+			} else if (!dish.isArchived() && !isNew) {
+				DishResponse now = summarize(dish, history);
+				BigDecimal then = shownPriceAt(dish, history, since);
+				// A first price since the visit counts too (from = null): it moves the typical price.
+				if (now.price() != null && (then == null || then.compareTo(now.price()) != 0)) {
+					repriced.add(new RepricedDish(dish.getId(), dish.getName(), then, now.price(), now.lastPriceAt()));
+				}
+			}
+		}
+		added.sort(Comparator.comparing(ChangedDish::at));
+		removed.sort(Comparator.comparing(ChangedDish::at));
+		return new MenuChangesSince(repriced, added, removed, median(pricesThen), median(pricesNow));
+	}
+
+	/** Every venue's typical price: the median shown price of its live dishes (CSD-51). */
+	@Transactional(readOnly = true)
+	public List<VenuePriceResponse> typicalPrices() {
+		List<Dish> live = dishes.findByArchivedFalse();
+		Map<String, List<DishPrice>> byDish = pricesByDish(live);
+		Map<String, List<BigDecimal>> byVenue = new TreeMap<>();
+		for (Dish dish : live) {
+			BigDecimal shown = summarize(dish, byDish.getOrDefault(dish.getId(), List.of())).price();
+			if (shown != null) byVenue.computeIfAbsent(dish.getVenueId(), v -> new ArrayList<>()).add(shown);
+		}
+		return byVenue.entrySet().stream().map(e -> new VenuePriceResponse(e.getKey(), median(e.getValue()))).toList();
+	}
+
+	/** The price the app showed for a dish at a moment: summarize over the reports made by then. */
+	private static BigDecimal shownPriceAt(Dish dish, List<DishPrice> newestFirst, Instant at) {
+		return summarize(dish, newestFirst.stream().filter(p -> !p.getReportedAt().isAfter(at)).toList()).price();
+	}
+
+	private static void addIfPriced(List<BigDecimal> prices, BigDecimal price) {
+		if (price != null) prices.add(price);
+	}
+
+	/** Middle value (mean of the two middle ones for an even count), to the cent; null for none. */
+	static BigDecimal median(List<BigDecimal> prices) {
+		if (prices.isEmpty()) return null;
+		List<BigDecimal> sorted = prices.stream().sorted().toList();
+		int mid = sorted.size() / 2;
+		BigDecimal middle = sorted.size() % 2 == 1 ? sorted.get(mid)
+				: sorted.get(mid - 1).add(sorted.get(mid)).divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP);
+		return middle.setScale(2, RoundingMode.HALF_UP);
 	}
 
 	@Transactional(readOnly = true)
@@ -198,10 +275,15 @@ public class MenuService {
 
 	private List<DishResponse> withPrices(List<Dish> found) {
 		if (found.isEmpty()) return List.of();
-		Map<String, List<DishPrice>> byDish = prices
-				.findByDishIdInOrderByReportedAtDesc(found.stream().map(Dish::getId).toList())
-				.stream().collect(Collectors.groupingBy(DishPrice::getDishId));
+		Map<String, List<DishPrice>> byDish = pricesByDish(found);
 		return found.stream().map(dish -> summarize(dish, byDish.getOrDefault(dish.getId(), List.of()))).toList();
+	}
+
+	/** One query for the dishes' prices, newest first, grouped per dish. */
+	private Map<String, List<DishPrice>> pricesByDish(List<Dish> found) {
+		if (found.isEmpty()) return Map.of();
+		return prices.findByDishIdInOrderByReportedAtDesc(found.stream().map(Dish::getId).toList())
+				.stream().collect(Collectors.groupingBy(DishPrice::getDishId));
 	}
 
 	private Dish find(String dishId) {

@@ -1,5 +1,7 @@
 package com.makanmatch.catalog_service.venue;
 
+import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -54,6 +56,16 @@ public class VenueService {
 	public List<VenueUpdateResponse> history(String venueId) {
 		find(venueId);
 		return updates.findByVenueIdOrderByCreatedAtDesc(venueId).stream().map(VenueUpdateResponse::from).toList();
+	}
+
+	/** Owner reports made after a moment (a diner's last visit), oldest first. */
+	@Transactional(readOnly = true)
+	public List<VenueUpdateResponse> updatesSince(String venueId, Instant since) {
+		find(venueId);
+		return updates.findByVenueIdOrderByCreatedAtDesc(venueId).stream()
+				.filter(u -> u.getCreatedAt().isAfter(since))
+				.sorted(Comparator.comparing(VenueUpdate::getCreatedAt))
+				.map(VenueUpdateResponse::from).toList();
 	}
 
 	/** Every venue's current owner-described state; the engine polls this to adjust recommendations. */

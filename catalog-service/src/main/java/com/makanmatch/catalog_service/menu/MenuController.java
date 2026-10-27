@@ -23,6 +23,7 @@ import com.makanmatch.catalog_service.menu.dto.DishUpdateRequest;
 import com.makanmatch.catalog_service.menu.dto.MenuChangesRequest;
 import com.makanmatch.catalog_service.menu.dto.PricePointResponse;
 import com.makanmatch.catalog_service.menu.dto.PriceReportRequest;
+import com.makanmatch.catalog_service.menu.dto.VenuePriceResponse;
 import com.makanmatch.catalog_service.security.Caller;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -65,6 +66,12 @@ public class MenuController {
 	public List<DishResponse> editMenu(@AuthenticationPrincipal Jwt jwt, @RequestHeader(name = ACT_AS, required = false) String actAs,
 			@PathVariable String venueId, @Valid @RequestBody MenuChangesRequest body) {
 		return menus.applyChanges(venueId, body, Caller.of(jwt, actAs));
+	}
+
+	@GetMapping("/venue-prices")
+	@Operation(summary = "Every venue's typical price: the median shown price of its live dishes")
+	public List<VenuePriceResponse> venuePrices() {
+		return menus.typicalPrices();
 	}
 
 	@GetMapping("/dishes")
