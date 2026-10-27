@@ -3,8 +3,14 @@
 //   dbLearnerStore     - Postgres (taste schema); survives restarts
 // Same interface for both:
 //   read(userId, name)            a copy of the user's state (a new user gets starter(name))
+<<<<<<< Updated upstream
 //   update(userId, name, change)  runs change(state) -> { result, review?, tasteVector? },
 //                                 saves the state, returns result
+=======
+//   update(userId, name, change)  runs change(state) -> { result, review?, tasteVector?, undone? },
+//                                 saves the state, returns result (undone = the latest
+//                                 review was just undone)
+>>>>>>> Stashed changes
 //   reset(userId)                 forgets everything the user taught the AI
 // Updates for one user run one at a time, so two quick reviews can't overwrite
 // each other's profile changes.
@@ -90,11 +96,19 @@ export function dbLearnerStore({ db, starter }) {
       return oneAtATime(userId, async () => {
         const state = await read(userId, name)
         const previousProfile = structuredClone(state.profile)
+<<<<<<< Updated upstream
         const { result, review, tasteVector } = await change(state)
+=======
+        const { result, review, tasteVector, undone } = await change(state)
+>>>>>>> Stashed changes
         await db.tx(async (tx) => {
           await tasteProfileRepository(tx).save(userId, state.profile)
           await rankingRepository(tx).replace(userId, state.rankings)
           if (review) await reviewRepository(tx).insert(userId, review)
+<<<<<<< Updated upstream
+=======
+          if (undone) await reviewRepository(tx).markLatestUndone(userId)
+>>>>>>> Stashed changes
           if (tasteVector !== undefined) await tasteProfileRepository(tx).saveVector(userId, tasteVector)
           if (profileChanged(previousProfile, state.profile)) {
             await tasteProfileHistoryRepository(tx).saveSnapshot(userId, state.profile)

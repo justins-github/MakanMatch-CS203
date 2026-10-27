@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { addDish as addCatalogDish } from '../api/catalogApi.js'
+<<<<<<< Updated upstream
 import { getProfile, getRankings, getVenueDishes, postBeliReview, searchVenues } from '../api/engineApi.js'
+=======
+import { getProfile, getRankings, getVenueDishes, postBeliReview, searchVenues, undoReview } from '../api/engineApi.js'
+>>>>>>> Stashed changes
 
 // Venue name with the server-computed match ranges bolded.
 function HighlightedName({ name, highlight }) {
@@ -51,6 +55,7 @@ function AccuracyMeter({ accuracy }) {
   )
 }
 
+<<<<<<< Updated upstream
 function DeltaPanel({ result }) {
   const { deltas, prediction } = result
   return (
@@ -59,11 +64,50 @@ function DeltaPanel({ result }) {
       <div className="delta-predict">
         Your ranking placed it {result.score10}/10 - the AI had predicted {prediction.predictedScore10}/10
       </div>
+=======
+const READ_BY = {
+  ai: 'Claude read your review',
+  keywords: "Read by keyword matching (Claude wasn't available)",
+}
+
+// What the AI learned from the review just posted, with Undo for when it got you
+// wrong (CSD-54): the profile goes back, the review and its score stay.
+function DeltaPanel({ result, onUndone }) {
+  const { deltas, prediction } = result
+  const [undo, setUndo] = useState({ busy: false, done: false, gone: false, error: null })
+
+  const undoIt = async () => {
+    setUndo({ busy: true, done: false, gone: false, error: null })
+    try {
+      await undoReview(result.review.dishId, result.review.at)
+      setUndo({ busy: false, done: true, gone: false, error: null })
+      onUndone()
+    } catch (err) {
+      // 409: a newer review (say, from another tab) or an earlier Undo got there first.
+      const gone = err.status === 409
+      setUndo({ busy: false, done: false, gone, error: gone ? "This review can't be undone any more." : `Undo failed: ${err.message}` })
+    }
+  }
+
+  return (
+    <div className={`delta-panel${undo.done ? ' undone' : ''}`}>
+      <div className="delta-title">{undo.done ? 'Undone' : 'The AI just learned'}</div>
+      {READ_BY[result.readBy] && <div className="delta-reader">{READ_BY[result.readBy]}</div>}
+      {!undo.done && (
+        <div className="delta-predict">
+          Your ranking placed it {result.score10}/10 - the AI had predicted {prediction.predictedScore10}/10
+        </div>
+      )}
+>>>>>>> Stashed changes
       {deltas.length === 0 && (
         <div className="delta-row">No profile change - this review matched what it already knew.</div>
       )}
       {deltas.map((d) => (
+<<<<<<< Updated upstream
         <div key={d.dimension} className="delta-row">
+=======
+        <div key={d.dimension} className={`delta-row${undo.done ? ' struck' : ''}`}>
+>>>>>>> Stashed changes
           <span className={`delta-arrow ${d.to > d.from ? 'up' : 'down'}`}>
             {d.to > d.from ? '▲' : '▼'}
           </span>
@@ -71,9 +115,29 @@ function DeltaPanel({ result }) {
           <span className="delta-vals">
             {d.from} → {d.to}
           </span>
+<<<<<<< Updated upstream
           <span className="delta-reason">{d.reason}</span>
         </div>
       ))}
+=======
+          {!undo.done && <span className="delta-reason">{d.reason}</span>}
+        </div>
+      ))}
+      {undo.done && (
+        <div className="delta-note">
+          Your Taste DNA is back to how it was before this review. Your {result.score10}/10 and ranking stay.
+        </div>
+      )}
+      {!undo.done && !undo.gone && deltas.length > 0 && (
+        <div className="delta-undo">
+          <span>Not what you meant?</span>
+          <button onClick={undoIt} disabled={undo.busy}>
+            {undo.busy ? 'Undoing…' : 'Undo these changes'}
+          </button>
+        </div>
+      )}
+      {undo.error && <div className="error">{undo.error}</div>}
+>>>>>>> Stashed changes
     </div>
   )
 }
@@ -473,7 +537,11 @@ export default function Review() {
             aria-label="Written review"
           />
           <button className="teach-btn" disabled={busy} onClick={submit}>
+<<<<<<< Updated upstream
             {busy ? 'Posting…' : 'Post review'}
+=======
+            {busy ? (text.trim() ? 'Reading your review…' : 'Posting…') : 'Post review'}
+>>>>>>> Stashed changes
           </button>
           {error && <div className="error">Review failed: {error}</div>}
         </>
@@ -487,7 +555,11 @@ export default function Review() {
               #{result.rank.index + 1} of {result.rank.total} · {dish.name}
             </span>
           </div>
+<<<<<<< Updated upstream
           <DeltaPanel result={result} />
+=======
+          <DeltaPanel key={result.review.at} result={result} onUndone={loadAll} />
+>>>>>>> Stashed changes
           <AccuracyMeter accuracy={accuracy} />
           <Leaderboard rankings={rankings} />
           <button className="teach-btn" onClick={startWizard}>

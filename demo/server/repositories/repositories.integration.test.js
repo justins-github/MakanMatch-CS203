@@ -31,6 +31,11 @@ test('migrations apply once and are recorded', async () => {
     '003_create_taste_profiles.sql',
     '004_create_venue_embeddings.sql',
     '005_create_taste_profile_history.sql',
+<<<<<<< Updated upstream
+=======
+    '006_add_review_signals.sql',
+    '007_add_review_undo.sql',
+>>>>>>> Stashed changes
   ])
   assert.deepEqual(await migrate(db), [])
 })
@@ -52,6 +57,39 @@ test('reviews round-trip in the shape learn.js uses', async () => {
   assert.equal(rated.sentiment, undefined, 'star reviews have no sentiment')
   assert.equal(rated.score10, undefined, 'star reviews have no 1-10 score')
   assert.deepEqual(rated.tags, ['worth-it'])
+<<<<<<< Updated upstream
+=======
+  assert.equal(rated.signals, undefined, 'reviews saved without a reading have no signals')
+  assert.equal(rated.readBy, undefined)
+})
+
+test('a review keeps what was read from its text', async () => {
+  const reviews = reviewRepository(db)
+  const signals = [{ dimension: 'spice', direction: 'down', strength: 3, quote: 'I hate the spice', why: 'x' }]
+  await reviews.insert(USER, {
+    dishId: 'rice-1', dishName: 'Chicken rice', venueId: 'tian-tian', rating: 1, sentiment: 'disliked',
+    tags: [], text: 'I hate the spice', signals, readBy: 'ai', score10: 2.5, predicted: 60, actual: 25, at: '2026-09-03T10:00:00.000Z',
+  })
+  const read = (await reviews.listForUser(USER)).find((r) => r.dishId === 'rice-1')
+  assert.deepEqual(read.signals, signals)
+  assert.equal(read.readBy, 'ai')
+})
+
+test('only the latest review brings back the profile before it, and undo marks it', async () => {
+  const reviews = reviewRepository(db)
+  const someone = '78787878-7878-7878-7878-787878787878'
+  const base = { dishName: 'Dish', venueId: 'turks-kebab', rating: 5, sentiment: 'loved', tags: [], text: '', predicted: 50, actual: 80 }
+  await reviews.insert(someone, { ...base, dishId: 'd-1', profileBefore: { spicePref: 0.5 }, at: '2026-09-04T10:00:00.000Z' })
+  await reviews.insert(someone, { ...base, dishId: 'd-2', profileBefore: { spicePref: 0.6 }, at: '2026-09-05T10:00:00.000Z' })
+  let [older, latest] = await reviews.listForUser(someone)
+  assert.equal(older.profileBefore, undefined, 'only the latest review can be undone, so only it needs this')
+  assert.deepEqual(latest.profileBefore, { spicePref: 0.6 })
+  assert.equal(latest.undone, undefined)
+  await reviews.markLatestUndone(someone)
+  ;[older, latest] = await reviews.listForUser(someone)
+  assert.equal(latest.undone, true)
+  assert.equal(older.undone, undefined)
+>>>>>>> Stashed changes
 })
 
 test('rankings keep their order when replaced', async () => {

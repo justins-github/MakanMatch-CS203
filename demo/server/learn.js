@@ -1,14 +1,32 @@
 // Taste-learning engine: every review nudges a user's profile.
+<<<<<<< Updated upstream
 // Three channels: sentiment, duels, and review text (see reviewText.js).
+=======
+// Three channels: sentiment, duels, and review text. The text arrives already
+// read (reviewReader.js: Claude, or the keyword list) as signals; this file
+// decides how far each one moves the profile.
+>>>>>>> Stashed changes
 // Pure logic over a per-user `state` ({ profile, reviews, rankings }); where that
 // state lives (memory or Postgres) is services/learnerStore.js's job.
 
 import { DEMO_USER } from './match.js'
+<<<<<<< Updated upstream
 import { matchSignals, countEvidence } from './reviewText.js'
 
 const ALPHA = 0.25 // sentiment learning rate
 const DUEL_ALPHA = 0.12 // per-duel nudge toward the winner
 const TEXT_BASE = 0.03 // per-signal text nudge, scaled by evidence
+=======
+import { keywordReading } from './reviewText.js'
+
+const ALPHA = 0.25 // sentiment learning rate
+const DUEL_ALPHA = 0.12 // per-duel nudge toward the winner
+const STRENGTH_STEP = { 1: 0.02, 2: 0.04, 3: 0.06 } // per text signal, before evidence
+const EVIDENCE_MAX = 3 // a theme repeated in 3+ of your reviews counts triple
+const TEXT_CAP = 0.12 // most the text can move one dimension in one review
+const PRICE_SCALE = 1.5 // price comfort runs 0-2, the others 0-1
+const BLAME_SCALE = 0.3 // cuisine nudge left when the review blames something specific
+>>>>>>> Stashed changes
 const DELTA_MIN = 0.0049 // smallest change worth reporting
 
 const clamp01 = (v) => Math.min(1, Math.max(0, v))
@@ -97,6 +115,7 @@ function makeToucher() {
   return { touch, deltas }
 }
 
+<<<<<<< Updated upstream
 // Nudges the profile from a 1-5 rating and optional tags.
 function collectRatingNudges(profile, dish, cuisine, rating, tags, touch) {
   const signal = (rating - 3) / 2 // -1 .. +1
@@ -111,6 +130,28 @@ function collectRatingNudges(profile, dish, cuisine, rating, tags, touch) {
   }
 
   if (signal !== 0) {
+=======
+// Nudges the profile from a 1-5 rating and optional tags. A rating only says how
+// much you liked the dish, so its spice/richness/price/novelty nudges are guesses
+// at why: `skip` drops the guess on dimensions your own words covered, and
+// `cuisineScale` shrinks the cuisine nudge when you blamed something specific.
+function collectRatingNudges(profile, dish, cuisine, rating, tags, touch, { skip = new Set(), cuisineScale = 1, blamedQuote } = {}) {
+  const signal = (rating - 3) / 2 // -1 .. +1
+
+  if (cuisine != null && !skip.has('cuisine')) {
+    const label = cuisine.replace(/-/g, ' ')
+    const from = profile.cuisineAffinity[cuisine] ?? 0.3
+    const target = clamp01(0.5 + signal * 0.5)
+    const to = clamp01(from + ALPHA * (target - from) * cuisineScale)
+    profile.cuisineAffinity[cuisine] = to
+    touch('affinity-' + cuisine, `${label} affinity`, from, to,
+      cuisineScale < 1
+        ? `you ${signal > 0 ? 'credited' : 'blamed'} "${blamedQuote}", not the cuisine`
+        : `${rating}★ on a ${label} dish`)
+  }
+
+  if (signal !== 0 && !skip.has('spice')) {
+>>>>>>> Stashed changes
     const sp = profile.spicePref
     const spTo = clamp01(sp + ALPHA * signal * (dish.spice - sp))
     if (spTo !== sp) {
@@ -120,6 +161,12 @@ function collectRatingNudges(profile, dish, cuisine, rating, tags, touch) {
           ? `you enjoyed something ${dish.spice > sp ? 'spicier' : 'milder'} than your usual`
           : `you disliked something ${dish.spice > sp ? 'spicier' : 'milder'} than your usual`)
     }
+<<<<<<< Updated upstream
+=======
+  }
+
+  if (signal !== 0 && !skip.has('richness')) {
+>>>>>>> Stashed changes
     const ri = profile.richnessPref
     const riTo = clamp01(ri + ALPHA * signal * (dish.richness - ri))
     if (riTo !== ri) {
@@ -131,14 +178,22 @@ function collectRatingNudges(profile, dish, cuisine, rating, tags, touch) {
     }
   }
 
+<<<<<<< Updated upstream
   if (dish.novelty >= 0.7 && signal !== 0) {
+=======
+  if (dish.novelty >= 0.7 && signal !== 0 && !skip.has('adventurousness')) {
+>>>>>>> Stashed changes
     const from = profile.adventurousness
     const to = clamp01(from + ALPHA * signal * 0.4)
     profile.adventurousness = to
     touch('adventurousness', 'Adventurousness', from, to, `${rating}★ on a high-novelty dish`)
   }
 
+<<<<<<< Updated upstream
   if (dish.priceTier > profile.priceComfort && signal !== 0) {
+=======
+  if (dish.priceTier > profile.priceComfort && signal !== 0 && !skip.has('price')) {
+>>>>>>> Stashed changes
     const from = profile.priceComfort
     const to = Math.min(2, Math.max(0, from + 0.2 * signal))
     profile.priceComfort = to
@@ -206,6 +261,7 @@ function collectDuelNudges(profile, duels, touch) {
   }
 }
 
+<<<<<<< Updated upstream
 // Nudges from review text; signals repeated across the user's past reviews compound.
 function collectTextNudges(state, text, touch) {
   if (!text) return
@@ -237,6 +293,76 @@ function collectTextNudges(state, text, touch) {
   }
 }
 
+=======
+// Two signals with the same key count as "the same thing said again" across reviews.
+const evidenceKey = (s, cuisine) =>
+  s.dimension === 'cuisine' ? `cuisine:${cuisine}:${s.direction}` : `${s.dimension}:${s.direction}`
+
+// Keys each past review carries; reviews saved before AI reading are re-read by
+// keywords, and undone reviews no longer count.
+function pastEvidence(reviews) {
+  return reviews
+    .filter((r) => !r.undone)
+    .map((r) => new Set((r.signals ?? keywordReading(r.text).signals).map((s) => evidenceKey(s, s.cuisine))))
+}
+
+// Where each dimension lives in the profile, and its range.
+const TEXT_TARGETS = {
+  spice: { touchKey: 'spice', label: 'Spice', get: (p) => p.spicePref, set: (p, v) => (p.spicePref = clamp01(v)) },
+  richness: { touchKey: 'richness', label: 'Richness', get: (p) => p.richnessPref, set: (p, v) => (p.richnessPref = clamp01(v)) },
+  adventurousness: { touchKey: 'adventurousness', label: 'Adventurousness', get: (p) => p.adventurousness, set: (p, v) => (p.adventurousness = clamp01(v)) },
+  price: { touchKey: 'price', label: 'Price comfort', scale: PRICE_SCALE, get: (p) => p.priceComfort, set: (p, v) => (p.priceComfort = Math.min(2, Math.max(0, v))) },
+}
+
+function cuisineTarget(cuisine) {
+  return {
+    touchKey: 'affinity-' + cuisine,
+    label: `${cuisine.replace(/-/g, ' ')} affinity`,
+    get: (p) => p.cuisineAffinity[cuisine] ?? 0.3,
+    set: (p, v) => (p.cuisineAffinity[cuisine] = clamp01(v)),
+  }
+}
+
+const targetFor = (dimension, cuisine) => (dimension === 'cuisine' ? cuisineTarget(cuisine) : TEXT_TARGETS[dimension])
+
+// What the review's signals would move, per dimension: strength x evidence
+// (repeats across your reviews compound), summed, then capped per review.
+function textMoves(state, reading, venue) {
+  const past = pastEvidence(state.reviews)
+  const moves = new Map()
+  for (const s of reading.signals) {
+    if (s.dimension === 'cuisine' && venue.cuisine == null) continue
+    const target = targetFor(s.dimension, venue.cuisine)
+    if (!target) continue
+    const n = 1 + past.filter((keys) => keys.has(evidenceKey(s, venue.cuisine))).length
+    const sign = s.direction === 'up' ? 1 : -1
+    const move = moves.get(s.dimension) ?? { target, amount: 0, quotes: [], n: 1 }
+    move.amount += sign * STRENGTH_STEP[s.strength] * Math.min(n, EVIDENCE_MAX) * (target.scale ?? 1)
+    move.quotes.push(`"${s.quote}"`)
+    move.n = Math.max(move.n, n)
+    moves.set(s.dimension, move)
+  }
+  for (const move of moves.values()) {
+    const cap = TEXT_CAP * (move.target.scale ?? 1)
+    move.amount = Math.min(cap, Math.max(-cap, move.amount))
+    move.reason = `you said ${move.quotes.join(', ')}` + (move.n > 1 ? ` (${move.n} of your reviews say so)` : '')
+  }
+  return moves
+}
+
+// How far the rating's guesses would move each dimension, without moving anything.
+function guessedMoves(profile, dish, cuisine, rating, options) {
+  const trial = structuredClone(profile)
+  collectRatingNudges(trial, dish, cuisine, rating, [], () => {}, options)
+  const guesses = new Map()
+  for (const dimension of [...Object.keys(TEXT_TARGETS), ...(cuisine != null ? ['cuisine'] : [])]) {
+    const target = targetFor(dimension, cuisine)
+    guesses.set(dimension, target.get(trial) - target.get(profile))
+  }
+  return guesses
+}
+
+>>>>>>> Stashed changes
 // Star-rating entry point. Mutates `state`; `review` in the result is the new record.
 export function applyReview(state, dish, venue, rating, tags = []) {
   const profile = state.profile
@@ -269,6 +395,7 @@ export function applyReview(state, dish, venue, rating, tags = []) {
 }
 
 // Beli-style entry point; duels arrive resolved as { winner, loser } dishes with cuisine.
+<<<<<<< Updated upstream
 export function applyBeliReview(state, dish, venue, { sentiment, duels = [], insertIndex = 0, text = '' }) {
   if (!SENTIMENTS.includes(sentiment)) throw new Error(`invalid sentiment "${sentiment}"`)
   const profile = state.profile
@@ -278,6 +405,46 @@ export function applyBeliReview(state, dish, venue, { sentiment, duels = [], ins
   collectRatingNudges(profile, dish, venue.cuisine, SENTIMENT_RATING[sentiment], [], touch)
   collectDuelNudges(profile, duels, touch)
   collectTextNudges(state, text, touch)
+=======
+// `reading` is the review text already read (reviewReader.js); without one the
+// keyword list reads `text` here.
+export function applyBeliReview(state, dish, venue, { sentiment, duels = [], insertIndex = 0, text = '', reading = keywordReading(text) }) {
+  if (!SENTIMENTS.includes(sentiment)) throw new Error(`invalid sentiment "${sentiment}"`)
+  const profile = state.profile
+  const profileBefore = structuredClone(profile) // what Undo puts back
+  const predicted = predictDishScore(dish, venue.cuisine, profile)
+
+  // On each dimension your words cover, they and the rating's guess are compared:
+  // pointing the same way, the bigger move wins; pointing different ways, your
+  // words win; words that cancel out leave the guess alone. A specific blame
+  // softens the cuisine nudge unless the cuisine itself is what you talked about;
+  // the blamed (or credited) words are the first non-cuisine ones Claude lists,
+  // since it is asked to put those first.
+  const { touch, deltas } = makeToucher()
+  const rating = SENTIMENT_RATING[sentiment]
+  const aboutCuisine = reading.signals.some((s) => s.dimension === 'cuisine')
+  const blamed = reading.signals.find((s) => s.dimension !== 'cuisine')
+  const ratingOptions = {
+    cuisineScale: reading.blame === 'specific' && blamed && !aboutCuisine ? BLAME_SCALE : 1,
+    blamedQuote: blamed?.quote,
+  }
+  const words = textMoves(state, reading, venue)
+  const guesses = guessedMoves(profile, dish, venue.cuisine, rating, ratingOptions)
+  const wordsBeatGuess = (dimension, { amount }) => {
+    const guess = guesses.get(dimension) ?? 0
+    if (amount === 0) return false
+    return !(Math.sign(guess) === Math.sign(amount) && Math.abs(guess) > Math.abs(amount))
+  }
+  const wordsWin = new Set([...words].filter(([dimension, move]) => wordsBeatGuess(dimension, move)).map(([dimension]) => dimension))
+
+  collectRatingNudges(profile, dish, venue.cuisine, rating, [], touch, { ...ratingOptions, skip: wordsWin })
+  collectDuelNudges(profile, duels, touch)
+  for (const [dimension, { target, amount, reason }] of words) {
+    const from = target.get(profile)
+    if (wordsWin.has(dimension)) target.set(profile, from + amount)
+    touch(target.touchKey, target.label, from, target.get(profile), reason)
+  }
+>>>>>>> Stashed changes
 
   // Re-reviewing moves the dish rather than duplicating it.
   state.rankings = state.rankings.filter((id) => id !== dish.id)
@@ -295,6 +462,12 @@ export function applyBeliReview(state, dish, venue, { sentiment, duels = [], ins
     sentiment,
     tags: [],
     text,
+<<<<<<< Updated upstream
+=======
+    signals: reading.signals.map((s) => (s.dimension === 'cuisine' ? { ...s, cuisine: venue.cuisine } : s)),
+    readBy: reading.readBy,
+    profileBefore,
+>>>>>>> Stashed changes
     score10,
     predicted,
     actual,
@@ -304,6 +477,10 @@ export function applyBeliReview(state, dish, venue, { sentiment, duels = [], ins
 
   return {
     review,
+<<<<<<< Updated upstream
+=======
+    readBy: reading.readBy,
+>>>>>>> Stashed changes
     deltas: deltas(),
     score10,
     rank: { index, total },
@@ -313,3 +490,18 @@ export function applyBeliReview(state, dish, venue, { sentiment, duels = [], ins
     profile,
   }
 }
+<<<<<<< Updated upstream
+=======
+
+// Undo (CSD-54): puts the profile back exactly as it was before your latest review,
+// when that review is the one named and hasn't been undone. The review, its score
+// and your ranking stay; it just stops counting as evidence. Null when not allowed.
+export function undoLatestReview(state, { dishId, at }) {
+  const latest = state.reviews.at(-1)
+  if (!latest || latest.undone || !latest.profileBefore) return null
+  if (latest.dishId !== dishId || latest.at !== at) return null
+  state.profile = structuredClone(latest.profileBefore)
+  latest.undone = true
+  return { review: latest, profile: state.profile, accuracy: getAccuracy(state) }
+}
+>>>>>>> Stashed changes

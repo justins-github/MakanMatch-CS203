@@ -110,3 +110,54 @@ test('owner reports: closed venues drop out, and a move keeps showing after late
   assert.equal('openingHours' in open[0].ownerUpdate, false)
   assert.deepEqual(closed.map((v) => [v.id, v.status]), [['yangon-flavours', 'TEMPORARILY_CLOSED']])
 })
+<<<<<<< Updated upstream
+=======
+
+const DOC_READING = {
+  readBy: 'ai',
+  blame: 'specific',
+  signals: [{ dimension: 'spice', direction: 'down', strength: 3, quote: 'I hate the spice', why: 'dislikes heat' }],
+}
+
+test('the reader sees the review and the user\'s profile, and its reading is applied', async () => {
+  const asked = []
+  const reader = { read: async (input) => { asked.push(input); return DOC_READING } }
+  const learners = memoryLearnerStore({ starter: starterProfile })
+  const reviews = createReviewService({ registry, learners, catalog: fakeCatalog(), seedDishes, vectors: { size: 0 }, reader })
+  const text = 'Price was alright but I hate the spice'
+  const result = await reviews.submitBeli(diner, beli('secret-laksa', { sentiment: 'disliked', text }))
+  const [input] = asked
+  assert.equal(input.text, text)
+  assert.equal(input.sentiment, 'disliked')
+  assert.equal(input.dish.id, 'secret-laksa')
+  assert.equal(input.venue.id, 'turks-kebab')
+  assert.equal(input.profile.spicePref, 0.5)
+  assert.equal(result.readBy, 'ai')
+  assert.equal((await learners.read(diner.id, 'Mei')).reviews.at(-1).readBy, 'ai')
+})
+
+test('without a reader, text is read by keywords', async () => {
+  const result = await service().submitBeli(diner, beli('secret-laksa', { text: 'way too oily' }))
+  assert.equal(result.readBy, 'keywords')
+})
+
+test('undo restores the Taste DNA and keeps the score and ranking', async () => {
+  const learners = memoryLearnerStore({ starter: starterProfile })
+  const reviews = createReviewService({ registry, learners, catalog: fakeCatalog(), seedDishes, vectors: { size: 0 } })
+  const before = (await learners.read(diner.id, 'Mei')).profile
+  const posted = await reviews.submitBeli(diner, beli('secret-laksa', { sentiment: 'disliked', text: 'way too oily' }))
+  const undone = await reviews.undoLatest(diner, { dishId: posted.review.dishId, at: posted.review.at })
+  assert.equal(undone.undone, true)
+  assert.deepEqual(undone.profile, before)
+  assert.deepEqual((await learners.read(diner.id, 'Mei')).profile, before)
+  assert.deepEqual((await reviews.rankings(diner)).map((r) => r.dishId), ['secret-laksa'])
+})
+
+test('undo is refused for a review that is no longer your latest, or with nothing named', async () => {
+  const reviews = service()
+  const first = await reviews.submitBeli(diner, beli('secret-laksa'))
+  await reviews.submitBeli(diner, beli('chicken-doner-wrap', { insertIndex: 1, sentiment: 'fine' }))
+  await assert.rejects(reviews.undoLatest(diner, { dishId: first.review.dishId, at: first.review.at }), { status: 409 })
+  await assert.rejects(reviews.undoLatest(diner, {}), { status: 400 })
+})
+>>>>>>> Stashed changes

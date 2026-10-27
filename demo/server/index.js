@@ -7,6 +7,10 @@ import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { config } from './config.js'
 import { createAccountClient } from './clients/accountClient.js'
+<<<<<<< Updated upstream
+=======
+import { createAiClient } from './clients/aiClient.js'
+>>>>>>> Stashed changes
 import { createCatalogClient } from './clients/catalogClient.js'
 import { migrate } from './db/migrate.js'
 import { openDatabase } from './db/pool.js'
@@ -15,6 +19,10 @@ import { starterProfile } from './learn.js'
 import { createTokenVerifier, requireAuth } from './middleware/requireAuth.js'
 import { loadRegistry } from './registry.js'
 import { venueEmbeddingRepository } from './repositories/venueEmbeddingRepository.js'
+<<<<<<< Updated upstream
+=======
+import { createReviewReader } from './reviewReader.js'
+>>>>>>> Stashed changes
 import { contextRoutes } from './routes/context.js'
 import { profileRoutes } from './routes/profile.js'
 import { recommendationRoutes } from './routes/recommendations.js'
@@ -52,10 +60,21 @@ const vectors = uploaded.count > 0
 if (vectors.size === 0) console.warn('venue vectors missing - run `node scripts/embed-venues.mjs`; ranking without the taste-vector term')
 else console.log(`taste vectors: ${vectors.size} venues via ${vectors.kind} (${vectors.model})`)
 
+<<<<<<< Updated upstream
 const accounts = createAccountClient({ baseUrl: config.accountServiceUrl })
 const catalog = createCatalogClient({ baseUrl: config.catalogServiceUrl })
 const recommendations = createRecommendationService({ registry, vectors, learners, catalog, accounts })
 const reviews = createReviewService({ registry, learners, catalog, seedDishes, vectors })
+=======
+// Claude reads review text when a key is set; otherwise the keyword list does.
+const ai = createAiClient(config.ai)
+console.log(ai.available ? `review reader: Claude (${ai.model})` : 'review reader: keyword matching (set ANTHROPIC_API_KEY to use Claude)')
+
+const accounts = createAccountClient({ baseUrl: config.accountServiceUrl })
+const catalog = createCatalogClient({ baseUrl: config.catalogServiceUrl })
+const recommendations = createRecommendationService({ registry, vectors, learners, catalog, accounts })
+const reviews = createReviewService({ registry, learners, catalog, seedDishes, vectors, reader: createReviewReader({ ai }) })
+>>>>>>> Stashed changes
 const profiles = createProfileService({ learners })
 const authenticated = requireAuth({
   verifyToken: createTokenVerifier({ supabaseUrl: config.supabaseUrl, jwtSecret: config.jwtSecret }),

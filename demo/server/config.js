@@ -19,6 +19,15 @@ export const config = {
   accountServiceUrl: withoutTrailingSlash(env.ACCOUNT_SERVICE_URL ?? 'http://localhost:8082'),
   catalogServiceUrl: withoutTrailingSlash(env.CATALOG_SERVICE_URL ?? 'http://localhost:8083'),
   db: databaseConfig(),
+<<<<<<< Updated upstream
+=======
+  // No key = AI off; everything that asks Claude has a non-AI fallback.
+  ai: {
+    apiKey: env.ANTHROPIC_API_KEY || null,
+    model: env.AI_MODEL || 'claude-haiku-5-5',
+    timeoutMs: Number(env.AI_TIMEOUT_MS ?? 6000),
+  },
+>>>>>>> Stashed changes
 }
 
 // ENGINE_DB=memory keeps learning state in memory (lost on restart);
