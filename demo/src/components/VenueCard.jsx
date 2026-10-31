@@ -111,20 +111,35 @@ function GroupScores({ scores }) {
   )
 }
 
-export default function VenueCard({ venue, index }) {
-  const [showMap, setShowMap] = useState(false)
+const directionsUrl = (v) => `https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lon}`
+
+// Tapping a card opens it in place: a map, then "Write a review" and "Directions".
+// The name is a real button so the keyboard can open it too.
+export default function VenueCard({ venue, index, open, onToggle, onReview }) {
   const dots = CONFIDENCE_DOTS[venue.confidence]
 
   // Construct a fallback address string for the map popup
   const fullAddress = [venue.area, venue.address ?? venue.postcode].filter(Boolean).join(' · ')
 
+  // Taps on the opened part, or on any other button or link, don't fold the card.
+  const toggle = (e) => {
+    const control = e.target.closest('button, a')
+    if (e.target.closest('.card-drawer') || (control && !control.classList.contains('card-name'))) return
+    onToggle()
+  }
+
   return (
     <article
-      className={`card${venue.experimental ? ' experimental' : ''}`}
+      className={`card tappable${open ? ' open' : ''}${venue.experimental ? ' experimental' : ''}`}
       style={{ '--i': index }}
+      onClick={toggle}
     >
       {venue.experimental && <div className="exp-eyebrow">Experimental pick</div>}
-      <h2>{venue.name}</h2>
+      <h2>
+        <button type="button" className="card-name" aria-expanded={open}>
+          {venue.name}
+        </button>
+      </h2>
       {venue.signature && <div className="dish">{venue.signature}</div>}
       <div className="meta">
         {fullAddress}
@@ -155,6 +170,7 @@ export default function VenueCard({ venue, index }) {
           <span key={n} className={`dot${n <= dots ? ` on-${venue.confidence}` : ''}`} />
         ))}
         {CONFIDENCE_TEXT[venue.confidence]}
+        <span className="card-more" aria-hidden="true">{open ? 'Close ▴' : 'Map · review ▾'}</span>
       </div>
       <div
         className="sticker"
@@ -164,39 +180,26 @@ export default function VenueCard({ venue, index }) {
         <span className="label">{venue.groupScores ? `all ${venue.groupScores.length}` : 'match'}</span>
       </div>
 
-      {/* Map Toggle Section */}
-      <div className="map-section" style={{ marginTop: '14px' }}>
-        <button
-          type="button"
-          className="map-toggle-btn"
-          onClick={() => setShowMap((v) => !v)}
-          style={{
-            background: 'none',
-            border: '1px solid rgba(0,0,0,0.15)',
-            padding: '6px 12px',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '0.85rem',
-            fontWeight: 500,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-        >
-          {showMap ? 'Hide map 🗺️' : 'View map & directions 🗺️'}
-        </button>
-
-        {showMap && (
-          <div style={{ marginTop: '12px' }}>
-            <EmbeddedMap
-              latitude={venue.latitude}
-              longitude={venue.longitude}
-              placeName={venue.name}
-              address={fullAddress}
-            />
+      {open && (
+        <div className="card-drawer">
+          <EmbeddedMap
+            latitude={venue.lat}
+            longitude={venue.lon}
+            placeName={venue.name}
+            address={fullAddress}
+            height={180}
+            directions={false}
+          />
+          <div className="card-actions">
+            <button type="button" className="btn" onClick={() => onReview(venue)}>
+              ✎ Write a review
+            </button>
+            <a className="btn quiet" href={directionsUrl(venue)} target="_blank" rel="noopener noreferrer">
+              Directions ↗
+            </a>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </article>
   )
 }
