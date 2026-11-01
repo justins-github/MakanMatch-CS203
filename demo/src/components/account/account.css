@@ -1,0 +1,277 @@
+/* ---------- profile, claims, role switcher ---------- */
+
+.account {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px 32px;
+}
+
+.account-meta {
+  font-family: var(--font-data);
+  font-size: 12px;
+  color: var(--ink-soft);
+  word-break: break-all;
+}
+
+.account-roles {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.claim-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.claim-item {
+  border-top: 1.5px dashed var(--ink-soft);
+  padding-top: 8px;
+}
+
+.claim-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.claim-venue {
+  font-weight: 600;
+}
+
+.claim-reason {
+  font-size: 13px;
+  color: var(--chili);
+}
+
+.claim-form {
+  box-shadow: none;
+  background: var(--paper-dim);
+}
+
+.claim-picked {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  border: var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  padding: 10px 12px;
+}
+
+/* ---------- dietary needs picker (sign-up + profile) ---------- */
+
+.diet {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.diet.folded {
+  gap: 8px;
+}
+
+.diet-group {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.diet-group legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-family: var(--font-data);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.diet-group small {
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  color: var(--ink-soft);
+}
+
+.diet-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.diet-chip {
+  appearance: none;
+  min-height: 32px;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 13px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.diet-chip[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* Restrictions are hard rules, so they light up chili red. */
+.diet-group.strict .diet-chip[aria-pressed='true'] {
+  background: var(--chili);
+  border-color: var(--chili);
+}
+
+.diet-chip:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: 2px;
+}
+
+/* Admin "view as" control, sits in the header next to the title. */
+.role-switch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.role-switch-label {
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-right: 4px;
+}
+
+.role-chip {
+  appearance: none;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  font-family: var(--font-data);
+  font-size: 11px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.role-chip[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.role-chip:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: 2px;
+}
+
+.role-chip:disabled {
+  cursor: progress;
+}
+
+/* The admin is being served as a lower role: a washed-out strip with a solid
+   label, monsoon blue for a user and pandan green for an owner. */
+.acting-tape {
+  --tape: var(--monsoon);
+  background: var(--monsoon-wash);
+  padding: 6px 12px;
+  text-align: center;
+}
+
+.acting-tape.as-owner {
+  --tape: var(--pandan);
+  background: var(--pandan-wash);
+}
+
+.acting-tape span {
+  display: inline-block;
+  background: var(--tape);
+  color: var(--paper);
+  border-radius: 6px;
+  padding: 2px 10px;
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ---------- Me: owner and admin tools, opened from the profile ---------- */
+
+.me-rows {
+  display: flex;
+  flex-direction: column;
+  border: var(--line);
+  border-radius: 12px;
+  box-shadow: 3px 3px 0 var(--ink);
+  overflow: hidden;
+}
+
+.me-row {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: none;
+  border-top: 1.5px dashed var(--ink-soft);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 18px;
+  text-align: left;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+
+.me-row:first-child {
+  border-top: none;
+}
+
+@media (hover: hover) {
+  .me-row:hover {
+    background: var(--paper-dim);
+  }
+}
+
+.me-row:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: -3px;
+}
+
+.me-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.me-row-title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.me-row-detail {
+  font-family: var(--font-data);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+
+/* "← Me" above the owner and admin screens. */
+.me-back {
+  align-self: flex-start;
+  margin: 4px 18px 0;
+}

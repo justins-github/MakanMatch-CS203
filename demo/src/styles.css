@@ -335,7 +335,7 @@ body {
   background: var(--paper);
   box-shadow: 4px 4px 0 var(--ink);
   padding: 14px 74px 14px 14px;
-  animation: rise 0.35s both;
+  animation: rise 0.35s backwards; /* not "both": a held transform would block the hover lift */
   animation-delay: calc(var(--i) * 45ms);
 }
 
@@ -1697,4 +1697,129 @@ body {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-soft);
+}
+
+/* ---------- tap a card to open it ---------- */
+
+.card.tappable {
+  cursor: pointer;
+  transition: translate 0.15s ease, box-shadow 0.15s ease;
+}
+
+.card.tappable:active:not(:has(.card-drawer:active)) {
+  translate: 1px 1px;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.card.experimental.tappable:active:not(:has(.card-drawer:active)) {
+  box-shadow: 2px 2px 0 var(--chili);
+}
+
+/* The name is the card's keyboard handle; it looks like the plain heading it replaced. */
+.card-name {
+  all: unset;
+  cursor: pointer;
+}
+
+.card-name:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.card-more {
+  margin-left: auto;
+  color: var(--ink);
+}
+
+.card-drawer {
+  margin: 12px -60px 0 0; /* the card keeps 74px on the right for the sticker */
+  padding-top: 12px;
+  border-top: 1.5px dashed var(--ink-soft);
+  cursor: default;
+  animation: rise 0.25s backwards;
+}
+
+.card-drawer .map-container {
+  border: var(--line);
+  isolation: isolate; /* Leaflet's layers sit at z-index 400+; keep them under the bottom bar */
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.card-actions .btn {
+  flex: 1;
+  text-align: center;
+  text-decoration: none;
+  font-size: 14px;
+  padding: 9px 12px;
+}
+
+.card-actions .btn.quiet {
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+/* ---------- hover: every button grows a little ---------- */
+
+/* `scale` rather than `transform`, so it adds to the press-in moves buttons already have. */
+:where(button, a.btn) {
+  transition: scale 0.12s ease, translate 0.12s ease, box-shadow 0.12s ease;
+}
+
+@media (hover: hover) {
+  :where(button, a.btn):not(:disabled):hover {
+    scale: 1.04;
+  }
+
+  /* Wide buttons and rows would grow far past their neighbours at 4%. */
+  :where(.big-btn, .venue-row, .teach-btn, .nav-item):not(:disabled):hover {
+    scale: 1.015;
+  }
+
+  .card.tappable:hover {
+    translate: -2px -2px;
+    box-shadow: 6px 6px 0 var(--ink);
+  }
+
+  .card.experimental.tappable:hover {
+    box-shadow: 6px 6px 0 var(--chili);
+  }
+}
+
+:where(button, a.btn):not(:disabled):active {
+  scale: 0.97;
+}
+
+/* Buttons that fill a bordered box (accordion headers, the rows in Me) would grow past
+   its outline, so they keep their own shaded hover instead. So does a card's name. */
+.fold-head:hover,
+.fold-head:active,
+.me-row:hover,
+.me-row:active,
+.card-name:hover,
+.card-name:active {
+  scale: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(button, a.btn),
+  .card.tappable {
+    transition: none;
+  }
+
+  :where(button, a.btn):hover,
+  :where(button, a.btn):active,
+  .card.tappable:hover,
+  .card.tappable:active {
+    scale: none;
+    translate: none;
+  }
+
+  .card-drawer {
+    animation: none;
+  }
 }

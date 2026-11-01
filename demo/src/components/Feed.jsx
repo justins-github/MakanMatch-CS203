@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import VenueCard from './VenueCard.jsx'
 
 const MOOD_NOTES = {
@@ -90,7 +91,8 @@ function Empty({ mode, group }) {
   )
 }
 
-export default function Feed({ mode, data, onFind, onSurprise, onAnother, onBack }) {
+export default function Feed({ mode, data, onFind, onSurprise, onAnother, onBack, onReview }) {
+  const [openId, setOpenId] = useState(null) // one card open at a time
   if (mode === 'idle') {
     return (
       <main className="feed">
@@ -127,7 +129,14 @@ export default function Feed({ mode, data, onFind, onSurprise, onAnother, onBack
       <OwnerReportsNote reports={data.ownerReports} />
       {data.venues.length === 0 && <Empty mode={mode} group={data.group} />}
       {data.venues.map((venue, i) => (
-        <VenueCard key={venue.id} venue={venue} index={i} />
+        <VenueCard
+          key={venue.id}
+          venue={venue}
+          index={i}
+          open={openId === venue.id}
+          onToggle={() => setOpenId((id) => (id === venue.id ? null : venue.id))}
+          onReview={onReview}
+        />
       ))}
       {mode === 'surprise' && data.venues.length > 0 && (
         <button className="teach-btn" onClick={onAnother}>
