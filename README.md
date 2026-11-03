@@ -52,7 +52,11 @@ avatar, and the logo appears on a splash screen while your session loads.
   get places scored for everyone at once (see below).
 - **Review**: search every venue, pick a dish (or add one the menu is missing)
   and rate it. You give it a sentiment, settle up to three head-to-head duels
-  against dishes you've already ranked, and can add a written review.
+  against dishes you've already ranked, and can add a written review. Your
+  **Makan Pet** is a baby otter that grows with daily review streaks; miss a day
+  and it faints until your next review wakes it up. It grows after 7, 21 and 42
+  consecutive review days. Use **Next day** on the pet card to test streaks and
+  missed days; **Reset test** starts the pet over.
 - **Taste DNA**: the learned profile, with six taste dimensions, per-cuisine
   affinities and a model-accuracy meter that climbs as its predictions improve.
 - **Me**: display name, username, password and dietary needs (restrictions,

@@ -5,6 +5,7 @@ import { BottomNav, TopBar } from './components/AppNav.jsx'
 import ContextBanner from './components/ContextBanner.jsx'
 import Feed from './components/Feed.jsx'
 import Login from './components/Login.jsx'
+import MakanPet, { useMakanPet } from './components/MakanPet.jsx'
 import Review from './components/Review.jsx'
 import Splash from './components/Splash.jsx'
 import TasteDna from './components/TasteDna.jsx'
@@ -60,6 +61,7 @@ export default function App() {
 
 function SignedInApp() {
   const { me, role } = useAuth()
+  const { pet, today, simulator, markReview, advanceDay, resetDaySimulator } = useMakanPet(me.id)
   const [tab, setTab] = useState('feed')
   const [reviewVenue, setReviewVenue] = useState(null) // set when a For you card starts a review
   const [mode, setMode] = useState('idle') // idle | find | surprise
@@ -132,6 +134,11 @@ function SignedInApp() {
     if (current) setExclude((ids) => [...ids, current.id])
   }
 
+  const startPetReview = () => {
+    setReviewVenue(null)
+    setTab('rate')
+  }
+
   const resetTaste = async () => {
     if (!window.confirm("Forget everything you've taught the AI? Your reviews, rankings and Taste DNA start over.")) return
     try {
@@ -173,6 +180,14 @@ function SignedInApp() {
               backToLanding()
             }}
           />
+          <MakanPet
+            pet={pet}
+            today={today}
+            simulator={simulator}
+            onCare={startPetReview}
+            onNextDay={advanceDay}
+            onResetSimulator={resetDaySimulator}
+          />
           {error ? (
             <main className="feed">
               <button className="back-link" onClick={backToLanding}>
@@ -206,7 +221,22 @@ function SignedInApp() {
       )}
 
       {tab === 'kakis' && <Kakis key={viewKey} onEatTogether={eatTogether} onOpenMe={() => setTab('me')} />}
-      {tab === 'rate' && <Review key={viewKey} startVenue={reviewVenue} />}
+      {tab === 'rate' && (
+        <>
+          <MakanPet
+            pet={pet}
+            today={today}
+            simulator={simulator}
+            onNextDay={advanceDay}
+            onResetSimulator={resetDaySimulator}
+          />
+          <Review
+            key={viewKey}
+            startVenue={reviewVenue}
+            onReviewSaved={markReview}
+          />
+        </>
+      )}
       {tab === 'dna' && <TasteDna key={viewKey} />}
       {tab === 'me' && <Me key={viewKey} onResetTaste={resetTaste} />}
 
