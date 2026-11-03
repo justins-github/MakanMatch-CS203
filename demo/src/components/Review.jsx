@@ -138,7 +138,7 @@ function Leaderboard({ rankings }) {
 const money = (v) => (v == null ? 'no price yet' : '$' + Number(v).toFixed(2))
 
 // startVenue: a venue picked on a For you card; the review starts at its dishes.
-export default function Review({ startVenue = null }) {
+export default function Review({ startVenue = null, onReviewSaved }) {
   const [loaded, setLoaded] = useState(false)
   const [venueDishes, setVenueDishes] = useState(null) // dishes at the chosen venue
   const [venueInfo, setVenueInfo] = useState(null) // { youManage, degraded }
@@ -280,6 +280,7 @@ export default function Review({ startVenue = null }) {
     setError(null)
     try {
       const r = await postBeliReview(dish.id, sentiment, insertIndex, duel?.pairs ?? [], text)
+      onReviewSaved?.()
       setResult(r)
       setAccuracy(r.accuracy)
       setStep('done')
