@@ -1,8 +1,9 @@
-// For You: top-10 walkable matches, or one experimental Surprise pick - for the
-// caller alone, or with kakis (?with=id,id).
+// For You: top-10 matches within a walk of where the caller is (X-Location, ?walk=),
+// or one experimental Surprise pick - for the caller alone, or with kakis (?with=id,id).
 import { Router } from 'express'
 import { asyncHandler, badRequest } from '../errors.js'
 import { withRainOverride } from '../weather.js'
+import { locationOf, walkLimitOf } from './location.js'
 
 const MOODS = ['none', 'soupy', 'spicy', 'light']
 const MAX_KAKIS = 9 // ten at the table, counting you
@@ -25,8 +26,10 @@ export function recommendationRoutes({ recommendations, getContext }) {
     const mood = MOODS.includes(req.query.mood) ? req.query.mood : 'none'
     const exclude = String(req.query.exclude ?? '').split(',').filter(Boolean)
     const withIds = kakiIds(req.query.with, req.user.id)
-    const context = withRainOverride(await getContext(), req.query.rain === '1')
-    res.json(await recommendations.recommend(req.user, { mode, mood, context, exclude, withIds }))
+    const from = locationOf(req)
+    const walkMin = walkLimitOf(req)
+    const context = withRainOverride(await getContext(from), req.query.rain === '1')
+    res.json(await recommendations.recommend(req.user, { mode, mood, context, exclude, withIds, from, walkMin }))
   }))
 
   return router

@@ -33,7 +33,6 @@ function seed(overrides = {}) {
     spice: 0.3,
     richness: 0.7,
     sheltered: true,
-    distanceMin: 5,
     reviewCount: 23,
     dataAgeDays: 20,
     signature: 'Chicken doner wrap',
@@ -41,13 +40,14 @@ function seed(overrides = {}) {
   }
 }
 
-test('overture rows get cuisine from taxonomy, computed distance, and data age', () => {
+test('overture rows get cuisine from taxonomy, coordinates, and data age', () => {
   const { venues } = buildRegistry([ovRow()], [], NOW)
   const [v] = venues
   assert.equal(v.cuisine, 'thai')
   assert.equal(v.reviewCount, 0)
   assert.equal(v.dataAgeDays, 21)
-  assert.ok(v.distanceMin >= 1 && v.distanceMin <= 15, `distance ${v.distanceMin} should be walkable`)
+  assert.deepEqual([v.lat, v.lon], [1.3, 103.8515])
+  assert.equal(v.distanceMin, undefined, 'walk time depends on where the user is, so it is worked out per request')
   assert.equal(v.source, 'overture')
 })
 
@@ -61,9 +61,8 @@ test('unmappable categories degrade to null cuisine', () => {
 })
 
 test('a seed matching an Overture record by name merges onto it, keeping its id and data', () => {
-  // Coordinates ~1.5 km out so the computed walk time cannot collide with the authored 5.
   const ov = ovRow({ name: "Turk's Kebab", categoryPrimary: 'doner_kebab_restaurant', lat: 1.31 })
-  const { venues, venueById } = buildRegistry([ov, ovRow({ name: 'Other Place' })], [seed()], NOW)
+  const { venues, venueById } = buildRegistry([ov, ovRow({ name: 'Other Place' })], [seed({ latitude: 1.2, longitude: 103.7 })], NOW)
   assert.equal(venues.length, 2, 'merged record must not appear twice')
   const merged = venueById.get('seed-1')
   assert.ok(merged, 'seed keeps its id')
@@ -72,13 +71,14 @@ test('a seed matching an Overture record by name merges onto it, keeping its id 
   assert.equal(merged.spice, 0.3)
   assert.equal(merged.reviewCount, 23)
   assert.equal(merged.source, 'community+overture')
-  assert.ok(merged.distanceMin !== 5, 'authored distance replaced by computed geometry')
+  assert.deepEqual([merged.lat, merged.lon], [1.31, 103.8515], "Overture's geometry beats the authored point")
 })
 
-test('an unmatched seed survives as a community-only venue with its authored distance', () => {
-  const { venueById, stats } = buildRegistry([ovRow()], [seed({ id: 'seed-x', name: 'Fictional Soto Corner' })], NOW)
+test('an unmatched seed survives as a community-only venue at its authored point', () => {
+  const fictional = seed({ id: 'seed-x', name: 'Fictional Soto Corner', latitude: 1.3015, longitude: 103.8505 })
+  const { venueById, stats } = buildRegistry([ovRow()], [fictional], NOW)
   const kept = venueById.get('seed-x')
   assert.equal(kept.source, 'community')
-  assert.equal(kept.distanceMin, 5)
+  assert.deepEqual([kept.lat, kept.lon], [1.3015, 103.8505])
   assert.deepEqual(stats.unmatched, ['Fictional Soto Corner'])
 })

@@ -5,10 +5,11 @@ import { memoryLearnerStore } from './learnerStore.js'
 import { buildSearchIndex } from '../search.js'
 import { createRecommendationService } from './recommendationService.js'
 
-const TURKS = { id: 'turks-kebab', name: "Turk's Kebab", cuisine: 'turkish', category: 'doner_kebab', distanceMin: 5 }
-const YANGON = { id: 'yangon-flavours', name: 'Yangon Flavours', cuisine: 'burmese', distanceMin: 9 }
-const AL_BAIK = { id: 'al-baik', name: 'Al Baik', cuisine: 'middle-eastern', category: 'halal_restaurant', distanceMin: 7 }
-const GREENDOT = { id: 'greendot', name: 'Greendot', cuisine: 'vegetarian', category: 'vegetarian_restaurant', distanceMin: 6 }
+// All a short walk north of SMU (1.2966, 103.85): 5, 9, 7 and 6 minutes.
+const TURKS = { id: 'turks-kebab', name: "Turk's Kebab", cuisine: 'turkish', category: 'doner_kebab', lat: 1.3002, lon: 103.85 }
+const YANGON = { id: 'yangon-flavours', name: 'Yangon Flavours', cuisine: 'burmese', lat: 1.3031, lon: 103.85 }
+const AL_BAIK = { id: 'al-baik', name: 'Al Baik', cuisine: 'middle-eastern', category: 'halal_restaurant', lat: 1.3016, lon: 103.85 }
+const GREENDOT = { id: 'greendot', name: 'Greendot', cuisine: 'vegetarian', category: 'vegetarian_restaurant', lat: 1.3009, lon: 103.85 }
 const registryOf = (venues) => ({ venues, venueById: new Map(venues.map((v) => [v.id, v])), searchIndex: buildSearchIndex(venues) })
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']
@@ -273,4 +274,44 @@ test('a fallback explanation is kept for a while before Claude is asked again', 
   clock += 11 * 60 * 1000
   await recs.explainChange(diner, 'turks-kebab')
   assert.equal(asked, 2)
+})
+
+// Recommendations from where the user is.
+const BEDOK_MRT = { lat: 1.324, lon: 103.93 }
+const JEFRI = { id: 'jefri-botak', name: 'Jefri Botak Chicken Rice', cuisine: 'chicken-rice', lat: 1.3248, lon: 103.9305 }
+const findFrom = (recs, where) => recs.recommend(diner, { mode: 'find', mood: null, context: { raining: false }, ...where })
+
+test('Find only keeps places within the walk of where you are, timed from there', async () => {
+  const recs = service({ venues: [TURKS, YANGON, JEFRI] })
+  const atSmu = await find(recs)
+  assert.deepEqual(atSmu.venues.map((v) => v.id).sort(), ['turks-kebab', 'yangon-flavours'])
+  assert.deepEqual(atSmu.near, { area: 'City', walkMin: 20 })
+
+  const inBedok = await findFrom(recs, { from: BEDOK_MRT })
+  assert.deepEqual(inBedok.venues.map((v) => v.id), ['jefri-botak'])
+  assert.equal(inBedok.venues[0].distanceMin, 1)
+  assert.ok(inBedok.venues[0].why.includes('1 min walk'))
+  assert.equal(inBedok.near.area, 'Bedok')
+})
+
+test('a shorter walk leaves out the places further away', async () => {
+  const result = await findFrom(service(), { walkMin: 6 })
+  assert.deepEqual(result.venues.map((v) => v.id), ['turks-kebab'])
+  assert.equal(result.near.walkMin, 6)
+})
+
+test('a place with no coordinates is never counted as nearby', async () => {
+  const recs = service({ venues: [TURKS, { id: 'nowhere', name: 'Nowhere Cafe', cuisine: 'turkish' }] })
+  assert.deepEqual((await find(recs)).venues.map((v) => v.id), ['turks-kebab'])
+})
+
+test('search counts the walk from where you are, so its match % agrees with the feed', async () => {
+  const recs = service({ venues: [TURKS, YANGON, JEFRI] })
+  const [fromSmu] = await recs.search(diner, 'jefri', 5)
+  const [fromBedok] = await recs.search(diner, 'jefri', 5, BEDOK_MRT)
+  assert.ok(fromSmu.distanceMin > 100)
+  assert.equal(fromBedok.distanceMin, 1)
+  assert.ok(fromBedok.matchScore > fromSmu.matchScore)
+  const fed = await findFrom(recs, { from: BEDOK_MRT })
+  assert.equal(fed.venues[0].matchScore, fromBedok.matchScore)
 })

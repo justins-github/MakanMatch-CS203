@@ -10,6 +10,7 @@ import { createAccountClient } from './clients/accountClient.js'
 import { createAiClient } from './clients/aiClient.js'
 import { createChangeExplainer } from './changeExplainer.js'
 import { createCatalogClient } from './clients/catalogClient.js'
+import { createOneMapClient } from './clients/oneMapClient.js'
 import { migrate } from './db/migrate.js'
 import { openDatabase } from './db/pool.js'
 import { errorHandler } from './errors.js'
@@ -20,6 +21,7 @@ import { venueEmbeddingRepository } from './repositories/venueEmbeddingRepositor
 import { createReviewReader } from './reviewReader.js'
 import { createSummaryWriter } from './tasteSummary.js'
 import { contextRoutes } from './routes/context.js'
+import { locationRoutes } from './routes/location.js'
 import { profileRoutes } from './routes/profile.js'
 import { recommendationRoutes } from './routes/recommendations.js'
 import { reviewRoutes } from './routes/reviews.js'
@@ -78,6 +80,7 @@ app.use(express.json({ limit: '32kb' }))
 app.use(contextRoutes({ getContext })) // public
 app.use('/api', authenticated) // everything below needs a signed-in user
 app.use(recommendationRoutes({ recommendations, getContext }))
+app.use(locationRoutes({ oneMap: createOneMapClient() }))
 app.use(venueRoutes({ recommendations }))
 app.use(reviewRoutes({ reviews }))
 app.use(profileRoutes({ profiles }))
