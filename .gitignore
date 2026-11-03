@@ -1,8 +1,32 @@
+# Dependencies
 node_modules/
+
+# Build output (Vite, Maven)
 dist/
 .vite/
+target/
+*.class
+coverage/
+
+# Maven wrapper download and Spring Initializr leftovers
+.mvn/wrapper/maven-wrapper.jar
+HELP.md
+
+# Logs and JVM crash dumps
+*.log
+npm-debug.log*
+hs_err_pid*
+replay_pid*
+
+# Secrets: every .env except the committed templates
 .env
+.env.*
+!.env.example
+
+# OS files
 .DS_Store
+Thumbs.db
+desktop.ini
 
 # AI assistant and editor config
 CLAUDE.md
@@ -12,6 +36,19 @@ CLAUDE.md
 .mcp.json
 docs/superpowers/
 .idea/
+*.iml
+*.iws
+*.ipr
+*.swp
+
+# Eclipse / VS Code Java project files generated next to each pom.xml
+.project
+.classpath
+.settings/
+.factorypath
+.apt_generated/
+.apt_generated_tests/
+.sts4-cache/
 
 # Generated venue embeddings (regenerate with `node scripts/embed-venues.mjs`)
 demo/server/data/venue_vectors.*
