@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.makanmatch.account_service.common.BadRequestException;
@@ -121,16 +122,7 @@ public class ProfileService {
 	 * so a stolen access token alone can't take over the account.
 	 */
 	public void changePassword(UUID id, String email, String currentPassword, String newPassword) {
-		if (email == null) throw new BadRequestException("This account has no email to verify the password against");
-		SupabaseSession check;
-		try {
-			check = supabase.signInWithPassword(email, currentPassword);
-		}
-		catch (SupabaseAuthException e) {
-			if (e.status() == 429) throw new BadRequestException("Too many attempts - wait a minute and try again");
-			if (e.isClientError()) throw new ForbiddenException("Current password is incorrect");
-			throw e;
-		}
+		SupabaseSession check = verifyPassword(email, currentPassword);
 		try {
 			supabase.updatePassword(id, newPassword);
 		}
@@ -140,6 +132,53 @@ public class ProfileService {
 		}
 		finally {
 			signOutQuietly(check.accessToken());
+		}
+	}
+
+	/**
+	 * Asked before the engine and the catalog forget the account, so a wrong
+	 * password or a last admin is caught while there is still nothing to undo.
+	 */
+	@Transactional(readOnly = true)
+	public void checkCanDelete(UUID id, String email, String password) {
+		Profile profile = get(id);
+		if (profile.isAdmin() && !profile.isDisabled() && countActiveAdmins() <= 1) {
+			throw new ConflictException("You're the only admin - make someone else an admin first");
+		}
+		signOutQuietly(verifyPassword(email, password).accessToken());
+	}
+
+	/**
+	 * The last step of deleting an account. Deleting the Supabase user ends every
+	 * session, and its row in auth.users takes the profile with it (foreign key), and
+	 * the profile its kakis, saved groups, venue claims and venue ownership. If
+	 * Supabase fails, nothing is gone and the person can simply try again.
+	 *
+	 * No transaction on purpose: Supabase deletes in this same database, and its
+	 * cascade would wait for any lock we held on the profile row (until our timeout).
+	 * deleteById afterwards only matters where that foreign key doesn't exist.
+	 */
+	@Transactional(propagation = Propagation.NOT_SUPPORTED)
+	public void delete(UUID id, String email, String password) {
+		checkCanDelete(id, email, password);
+		try {
+			supabase.deleteUser(id);
+		}
+		catch (SupabaseAuthException e) {
+			if (e.status() != 404) throw e;
+		}
+		profiles.deleteById(id);
+	}
+
+	private SupabaseSession verifyPassword(String email, String password) {
+		if (email == null) throw new BadRequestException("This account has no email to verify the password against");
+		try {
+			return supabase.signInWithPassword(email, password);
+		}
+		catch (SupabaseAuthException e) {
+			if (e.status() == 429) throw new BadRequestException("Too many attempts - wait a minute and try again");
+			if (e.isClientError()) throw new ForbiddenException("Current password is incorrect");
+			throw e;
 		}
 	}
 

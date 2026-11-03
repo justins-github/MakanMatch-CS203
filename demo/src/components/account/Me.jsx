@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../../auth/AuthContext.jsx'
 import AdminPanel from '../admin/AdminPanel.jsx'
 import MyVenues from '../owner/MyVenues.jsx'
+import DeleteAccount from './DeleteAccount.jsx'
 import Profile from './Profile.jsx'
 import RoleSwitcher from './RoleSwitcher.jsx'
 import './account.css'
@@ -64,6 +65,7 @@ export default function Me({ onResetTaste }) {
           Log out
         </button>
       </div>
+      <DeleteAccount />
     </Profile>
   )
 }

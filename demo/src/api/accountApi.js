@@ -17,6 +17,9 @@ export const getMe = () => request('/api/me')
 export const updateMe = (changes) => request('/api/me', { method: 'PATCH', body: changes })
 export const changePassword = (currentPassword, newPassword) =>
   request('/api/me/password', { method: 'PUT', body: { currentPassword, newPassword } })
+// Deleting an account: check first (nothing is gone yet), delete last (see DeleteAccount.jsx).
+export const checkDeleteAccount = (password) => post('/api/me/delete-check', { password })
+export const deleteAccount = (password) => post('/api/me/delete', { password })
 
 // Kakis: each call that changes something answers with the whole updated list.
 export const getKakis = () => request('/api/kakis')

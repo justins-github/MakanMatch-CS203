@@ -5,6 +5,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -35,6 +36,11 @@ public class VenueService {
 		this.venues = venues;
 		this.updates = updates;
 		this.access = access;
+	}
+
+	/** For a deleted account: its status reports stay, unattributed. */
+	public void forgetReporter(UUID userId) {
+		updates.forgetReporter(userId);
 	}
 
 	@Transactional(readOnly = true)

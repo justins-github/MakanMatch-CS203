@@ -47,6 +47,11 @@ public class OpeningHoursService {
 		this.access = access;
 	}
 
+	/** For a deleted account: the hours it set stay, unattributed. */
+	public void forgetSetter(UUID userId) {
+		sessions.forgetSetter(userId);
+	}
+
 	@Transactional(readOnly = true)
 	public OpeningHoursResponse get(String venueId) {
 		venues.requireExists(venueId);

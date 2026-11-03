@@ -34,3 +34,6 @@ export const updateDish = (dishId, changes) => request(`/api/catalog/dishes/${id
 export const reportPrice = (dishId, price) =>
   request(`/api/catalog/dishes/${id(dishId)}/prices`, { method: 'POST', body: { price } })
 export const getPriceHistory = (dishId) => request(`/api/catalog/dishes/${id(dishId)}/prices`)
+
+// Before an account is deleted: what you added stays, without your name on it.
+export const forgetMyContributions = () => request('/api/catalog/me/contributions', { method: 'DELETE' })

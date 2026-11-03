@@ -1,6 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthContext.jsx'
+import { DELETED_KEY } from './account/DeleteAccount.jsx'
 import './login.css'
+
+function justDeleted() {
+  try {
+    return sessionStorage.getItem(DELETED_KEY) === '1'
+  } catch {
+    return false
+  }
+}
 
 // Sign in with an email, or with a username once you've set one in Me.
 export default function Login({ onCreateAccount }) {
@@ -11,6 +20,16 @@ export default function Login({ onCreateAccount }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [showReset, setShowReset] = useState(false)
+  const [deleted] = useState(justDeleted)
+
+  // The goodbye note shows once; a reload goes back to the plain sign-in page.
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem(DELETED_KEY)
+    } catch {
+      // nothing to clear
+    }
+  }, [])
 
   const submit = async (e) => {
     e.preventDefault()
@@ -34,6 +53,12 @@ export default function Login({ onCreateAccount }) {
         </h1>
         <p className="login-tagline">Sign in to pick up where your tastebuds left off.</p>
       </div>
+
+      {deleted && (
+        <p className="login-note" role="status">
+          Your account has been deleted. Thanks for eating with us.
+        </p>
+      )}
 
       <form className="login-form" onSubmit={submit}>
         <label className="login-field">
