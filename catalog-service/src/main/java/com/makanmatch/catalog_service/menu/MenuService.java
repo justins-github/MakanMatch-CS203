@@ -12,6 +12,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -61,6 +62,12 @@ public class MenuService {
 		this.prices = prices;
 		this.venues = venues;
 		this.access = access;
+	}
+
+	/** For a deleted account: its dishes and prices stay, unattributed. */
+	public void forgetContributor(UUID userId) {
+		dishes.forgetCreator(userId);
+		prices.forgetReporter(userId);
 	}
 
 	@Transactional(readOnly = true)

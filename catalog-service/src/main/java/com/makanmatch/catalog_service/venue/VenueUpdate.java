@@ -34,7 +34,7 @@ public class VenueUpdate {
 	@Column(name = "note")
 	private String note;
 
-	@Column(name = "reported_by", nullable = false)
+	@Column(name = "reported_by")
 	private UUID reportedBy;
 
 	@Column(name = "created_at", nullable = false, updatable = false)

@@ -86,6 +86,11 @@ public class SupabaseAuthClient {
 				.body(Map.of("password", newPassword)), SupabaseUser.class);
 	}
 
+	/** Deletes the login for good; every refresh token it had stops working. */
+	public void deleteUser(UUID id) {
+		call(http.delete().uri("/admin/users/{id}", id).headers(this::adminHeaders), Void.class);
+	}
+
 	/** Banned users can't sign in or refresh, so a disabled account is locked out within one token lifetime. */
 	public void setBanned(UUID id, boolean banned) {
 		call(http.put().uri("/admin/users/{id}", id).headers(this::adminHeaders)

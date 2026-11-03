@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -158,6 +159,35 @@ class MeControllerTest {
 				.content("{\"dietary\":{\"restrictions\":[\"KETO\"]}}"))
 				.andExpect(status().isBadRequest());
 		verify(profiles, never()).update(any(), any(), any(), any());
+	}
+
+	@Test
+	void deleteCheckAndDeleteUseTheCallersOwnAccount() throws Exception {
+		mvc.perform(post("/api/me/delete-check").with(signedIn(EffectiveRole.USER))
+				.contentType(MediaType.APPLICATION_JSON).content("{\"password\":\"right-pass1\"}"))
+				.andExpect(status().isNoContent());
+		mvc.perform(post("/api/me/delete").with(signedIn(EffectiveRole.USER))
+				.contentType(MediaType.APPLICATION_JSON).content("{\"password\":\"right-pass1\"}"))
+				.andExpect(status().isNoContent());
+
+		verify(profiles).checkCanDelete(ID, "diner@example.com", "right-pass1");
+		verify(profiles).delete(ID, "diner@example.com", "right-pass1");
+	}
+
+	@Test
+	void deletingNeedsThePassword() throws Exception {
+		mvc.perform(post("/api/me/delete").with(signedIn(EffectiveRole.USER))
+				.contentType(MediaType.APPLICATION_JSON).content("{}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errors.password").exists());
+		verify(profiles, never()).delete(any(), any(), any());
+	}
+
+	@Test
+	void deletingNeedsASignedInCaller() throws Exception {
+		mvc.perform(post("/api/me/delete").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"password\":\"right-pass1\"}"))
+				.andExpect(status().isUnauthorized());
 	}
 
 	private static RequestPostProcessor signedIn(EffectiveRole role) {

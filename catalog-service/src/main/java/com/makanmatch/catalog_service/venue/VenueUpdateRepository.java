@@ -5,12 +5,18 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface VenueUpdateRepository extends JpaRepository<VenueUpdate, UUID> {
 
 	List<VenueUpdate> findByVenueIdOrderByCreatedAtDesc(String venueId);
+
+	/** The reports stay (they are the venue's history); who made them goes. */
+	@Modifying
+	@Query("update VenueUpdate u set u.reportedBy = null where u.reportedBy = :userId")
+	int forgetReporter(@Param("userId") UUID userId);
 
 	/** The newest report for every venue that has one. */
 	@Query(value = """

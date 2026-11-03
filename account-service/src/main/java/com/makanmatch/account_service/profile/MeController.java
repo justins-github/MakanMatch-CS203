@@ -8,6 +8,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.makanmatch.account_service.common.EffectiveRole;
 import com.makanmatch.account_service.profile.dto.ChangePasswordRequest;
+import com.makanmatch.account_service.profile.dto.DeleteAccountRequest;
 import com.makanmatch.account_service.profile.dto.MeResponse;
 import com.makanmatch.account_service.profile.dto.UpdateProfileRequest;
 
@@ -58,6 +60,27 @@ public class MeController {
 	@Operation(summary = "Change password (the current password is re-checked)")
 	public void changePassword(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ChangePasswordRequest body) {
 		profiles.changePassword(userId(jwt), jwt.getClaimAsString("email"), body.currentPassword(), body.newPassword());
+	}
+
+	/*
+	 * Deleting an account takes three calls from the browser, because services
+	 * only ever call account-service, never the other way: 1. delete-check here,
+	 * 2. the engine and catalog forget their data, 3. delete here (which ends the
+	 * account, so it has to come last).
+	 */
+
+	@PostMapping("/delete-check")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	@Operation(summary = "Before deleting: is the password right, and may this account go? (403 / 409 if not)")
+	public void checkDelete(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody DeleteAccountRequest body) {
+		profiles.checkCanDelete(userId(jwt), jwt.getClaimAsString("email"), body.password());
+	}
+
+	@PostMapping("/delete")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	@Operation(summary = "Delete this account for good (the password is re-checked)")
+	public void delete(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody DeleteAccountRequest body) {
+		profiles.delete(userId(jwt), jwt.getClaimAsString("email"), body.password());
 	}
 
 	private static UUID userId(Jwt jwt) {

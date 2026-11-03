@@ -4,7 +4,9 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -39,7 +41,14 @@ public class ProfileAuthenticationConverter implements Converter<Jwt, AbstractAu
 	@Override
 	public AbstractAuthenticationToken convert(Jwt jwt) {
 		UUID userId = UUID.fromString(jwt.getSubject());
-		Profile profile = profiles.loadOrCreate(userId, fallbackDisplayName(jwt));
+		Profile profile;
+		try {
+			profile = profiles.loadOrCreate(userId, fallbackDisplayName(jwt));
+		}
+		catch (DataIntegrityViolationException e) {
+			// a token issued before its account was deleted: no auth.users row to hang a profile on
+			throw new BadCredentialsException("This account no longer exists");
+		}
 		if (profile.isDisabled()) {
 			throw new DisabledException("This account has been disabled");
 		}
