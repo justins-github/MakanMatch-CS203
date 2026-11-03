@@ -30,15 +30,20 @@ a real sign-in screen. `npm test` runs the engine tests (`node --test`).
   your avatar, and a splash screen with the logo while the session loads. Owner and
   admin tools (My venues, Admin, View as) open from **Me**, so the bar never grows.
 
-- **For you** - a two-button landing: **Find me a restaurant** returns the top-10
-  matches walkable from SMU (≤20 min, real geometry), **Surprise me** returns one
+- **For you** - a two-button landing under a "📍 Near SMU · 20-min walk · Change" line.
+  Change picks where to search from: the browser's location, a OneMap place / MRT /
+  postcode search (`GET /api/locations/search`), or a quick pick, plus a 10/20/30-min
+  walk. It's kept in localStorage and sent to the engine as an `X-Location: lat,lon`
+  header (SMU when absent); walk times are straight-line at 80 m/min, worked out per
+  request (`server/geo.js`). **Find me a restaurant** returns the top-10
+  matches within that walk, **Surprise me** returns one
   experimental pick from a cuisine your Taste DNA hasn't grown into yet (with an
   "Another surprise" reroll). Every venue gets a personalised Match Score with a
   confidence indicator (Overture record confidence + data age + review volume) and
   "why" chips - but only the chips its data supports: Overture-seeded venues show
   cuisine + distance, community-enriched ones add spice/heartiness/price/shelter,
   and an information cap keeps a barebones venue from claiming a 99% match. The
-  weather chip in the top bar shows the *live* two-hour forecast from data.gov.sg; when it rains (or an
+  weather chip in the top bar shows the *live* two-hour forecast from data.gov.sg for the forecast area nearest you; when it rains (or an
   admin presses **Simulate rain**), venues *known* to be sheltered get boosted and the
   chips explain the re-rank. Halal and vegetarian needs from your profile are
   dealbreakers (`server/dietary.js`).

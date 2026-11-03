@@ -74,7 +74,7 @@ function DietaryNote({ dietary, group }) {
   )
 }
 
-function Empty({ mode, group }) {
+function Empty({ mode, group, walkMin }) {
   if (group) {
     return (
       <div className="loading">
@@ -85,9 +85,11 @@ function Empty({ mode, group }) {
     )
   }
   return mode === 'surprise' ? (
-    <div className="loading">No surprises left within a walk - you've met them all. Reset or go find instead.</div>
+    <div className="loading">
+      No surprises left within a {walkMin}-min walk - you've met them all. Try a longer walk, another spot, or go find instead.
+    </div>
   ) : (
-    <div className="loading">Nothing nearby fits right now.</div>
+    <div className="loading">Nothing within a {walkMin}-min walk fits right now. Try a longer walk or another spot.</div>
   )
 }
 
@@ -97,7 +99,6 @@ export default function Feed({ mode, data, onFind, onSurprise, onAnother, onBack
     return (
       <main className="feed">
         <div className="landing">
-          <div className="landing-loc">📍 Near SMU · walkable in 20 min</div>
           <h2 className="landing-title">What are we eating?</h2>
           <p className="landing-note">
             Every Singapore venue we know, matched live against your Taste DNA.
@@ -127,7 +128,7 @@ export default function Feed({ mode, data, onFind, onSurprise, onAnother, onBack
       {MOOD_NOTES[data.mood] && <div className="rerank-note">{MOOD_NOTES[data.mood]}</div>}
       <DietaryNote dietary={data.dietary} group={data.group} />
       <OwnerReportsNote reports={data.ownerReports} />
-      {data.venues.length === 0 && <Empty mode={mode} group={data.group} />}
+      {data.venues.length === 0 && <Empty mode={mode} group={data.group} walkMin={data.near?.walkMin ?? 20} />}
       {data.venues.map((venue, i) => (
         <VenueCard
           key={venue.id}

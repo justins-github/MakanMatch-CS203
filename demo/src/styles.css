@@ -198,188 +198,6 @@ body {
   outline-offset: 2px;
 }
 
-/* ---------- Makan Pet ---------- */
-
-.makan-pet {
-  display: grid;
-  grid-template-columns: 76px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  margin: 8px 18px 0;
-  padding: 10px;
-  border: var(--line);
-  border-radius: 12px;
-  background: #fff3cc;
-  box-shadow: 3px 3px 0 var(--ink);
-}
-
-.makan-pet.is-fainted {
-  background: var(--monsoon-wash);
-}
-
-.makan-pet-picture {
-  display: grid;
-  place-items: center;
-  width: 76px;
-  height: 72px;
-  overflow: hidden;
-}
-
-.makan-pet-art {
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  transform-origin: center bottom;
-  transition: transform 250ms ease, opacity 250ms ease;
-}
-
-.makan-pet-art[data-stage='baby'] { transform: scale(.78); }
-.makan-pet-art[data-stage='little'] { transform: scale(.88); }
-.makan-pet-art[data-stage='growing'] { transform: scale(.96); }
-.makan-pet-art[data-stage='grown'] { transform: scale(1.05); }
-.makan-pet-art.fainted { opacity: .7; }
-
-.makan-pet-info {
-  min-width: 0;
-}
-
-.makan-pet-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-
-.makan-pet-eyebrow {
-  color: var(--ink-soft);
-  font-family: var(--font-data);
-  font-size: 9px;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-.makan-pet h2 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 17px;
-  font-weight: 400;
-  line-height: 1.15;
-}
-
-.makan-pet-streak {
-  flex: none;
-  border: 1.5px solid var(--ink);
-  border-radius: 999px;
-  background: var(--paper);
-  padding: 3px 6px;
-  font-family: var(--font-data);
-  font-size: 9px;
-  white-space: nowrap;
-}
-
-.makan-pet-info p {
-  margin: 4px 0;
-  font-size: 11px;
-  line-height: 1.3;
-}
-
-.makan-pet-progress {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.makan-pet-progress > span {
-  flex: 1;
-  height: 6px;
-  min-width: 24px;
-  overflow: hidden;
-  border: 1px solid var(--ink);
-  border-radius: 999px;
-  background: var(--paper);
-}
-
-.makan-pet-progress i {
-  display: block;
-  height: 100%;
-  background: var(--pandan);
-  transition: width 250ms ease;
-}
-
-.makan-pet-progress small {
-  color: var(--ink-soft);
-  font-family: var(--font-data);
-  font-size: 8px;
-  white-space: nowrap;
-}
-
-.makan-pet-care {
-  appearance: none;
-  border: 1.5px solid var(--ink);
-  border-radius: 8px;
-  background: var(--kunyit);
-  padding: 6px 8px;
-  color: var(--ink);
-  font: 600 10px var(--font-body);
-  cursor: pointer;
-}
-
-.makan-pet-care:focus-visible {
-  outline: 3px solid var(--monsoon);
-  outline-offset: 2px;
-}
-
-.makan-pet-error {
-  margin-top: 4px;
-  color: var(--chili);
-  font-size: 9px;
-}
-
-.makan-pet-simulator {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  border-top: 1px dashed var(--ink-soft);
-  padding-top: 7px;
-  color: var(--ink-soft);
-  font-family: var(--font-data);
-  font-size: 9px;
-}
-
-.makan-pet-simulator > div {
-  display: flex;
-  gap: 6px;
-}
-
-.makan-pet-simulator button {
-  appearance: none;
-  border: 1px solid var(--ink);
-  border-radius: 6px;
-  background: var(--paper);
-  padding: 4px 6px;
-  color: var(--ink);
-  font: 600 9px var(--font-body);
-  cursor: pointer;
-}
-
-.makan-pet-simulator button:first-child {
-  background: var(--kunyit);
-}
-
-.makan-pet-simulator button:focus-visible {
-  outline: 3px solid var(--monsoon);
-  outline-offset: 2px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .makan-pet-art,
-  .makan-pet-progress i {
-    transition: none;
-  }
-}
-
 /* While the session loads: the logo, on chili red. */
 .splash {
   flex: 1;
@@ -645,10 +463,115 @@ body {
   padding-top: 22px;
 }
 
-.landing-loc {
+/* Where For you searches from: one line, and the picker under it. */
+.loc {
+  margin: 12px 18px 0;
+}
+
+.loc-line {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 4px 0;
   font-family: var(--font-data);
   font-size: 12px;
   color: var(--ink-soft);
+  text-align: left;
+  cursor: pointer;
+}
+
+.loc-change {
+  flex: none;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 12.5px;
+  color: var(--monsoon);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.loc-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 6px;
+  border: var(--line);
+  border-radius: 12px;
+  background: var(--paper-dim);
+  padding: 12px;
+}
+
+.loc-gps {
+  align-self: flex-start;
+  margin-top: 0;
+}
+
+.loc-msg {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.loc-results {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.loc-result {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  border: 1.5px solid var(--ink);
+  border-radius: 8px;
+  background: var(--paper);
+  padding: 7px 10px;
+  font-family: var(--font-body);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.loc-result-name {
+  font-weight: 600;
+  font-size: 13.5px;
+}
+
+.loc-result-detail {
+  font-family: var(--font-data);
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.loc-label {
+  font-family: var(--font-data);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+
+.loc-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.loc-chips .chip {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+}
+
+.loc-line:focus-visible,
+.loc-result:focus-visible {
+  outline: 3px solid var(--monsoon);
+  outline-offset: 2px;
 }
 
 .landing-title {
