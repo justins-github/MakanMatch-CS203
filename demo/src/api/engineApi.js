@@ -1,22 +1,35 @@
 // The recommendation engine (Express): feed, search, reviews, Taste DNA.
 import { request } from './http.js'
 
-export const getContext = (simRain = false) => request(`/api/context${simRain ? '?rain=1' : ''}`, { auth: false })
+// Where the user is searching from ({ lat, lon }). The calls that score venues send it
+// as an X-Location header, which keeps it out of URLs; unset, the engine assumes SMU.
+let here = null
+export function setLocation(point) {
+  here = point ? { lat: point.lat, lon: point.lon } : null
+}
+const located = () => (here ? { 'x-location': `${here.lat},${here.lon}` } : {})
 
-// withIds: kakis eating with you (group mode); empty for just you.
-export function getRecommendations(mode, mood = 'none', simRain = false, exclude = [], withIds = []) {
-  const params = new URLSearchParams({ mode, mood })
+export const getContext = (simRain = false) =>
+  request(`/api/context${simRain ? '?rain=1' : ''}`, { auth: false, headers: located() })
+
+// withIds: kakis eating with you (group mode); empty for just you. walkMin: how far to look.
+export function getRecommendations(mode, mood = 'none', simRain = false, exclude = [], withIds = [], walkMin = 20) {
+  const params = new URLSearchParams({ mode, mood, walk: walkMin })
   if (simRain) params.set('rain', '1')
   if (exclude.length) params.set('exclude', exclude.join(','))
   if (withIds.length) params.set('with', withIds.join(','))
-  return request(`/api/recommendations?${params}`)
+  return request(`/api/recommendations?${params}`, { headers: located() })
 }
 
 // Typeahead search; pass an AbortSignal to cancel superseded requests.
 export function searchVenues(q, { limit = 8, signal } = {}) {
   const params = new URLSearchParams({ q, limit })
-  return request(`/api/venues/search?${params}`, { signal })
+  return request(`/api/venues/search?${params}`, { signal, headers: located() })
 }
+
+// Places to search from (OneMap): { results: [{ label, detail, lat, lon }], available }.
+export const searchPlaces = (q, { signal } = {}) =>
+  request(`/api/locations/search?${new URLSearchParams({ q })}`, { signal })
 
 export const getProfile = () => request('/api/profile')
 

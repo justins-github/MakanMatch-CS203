@@ -38,10 +38,14 @@ The app has five tabs along the bottom: **For you**, **Kakis**, a raised **+** f
 **Review**, **Taste DNA** and **Me**. The top bar shows the weather and your
 avatar, and the logo appears on a splash screen while your session loads.
 
-- **Find me a restaurant**: the ten best matches within a 20-minute walk. Each
+- **Where you are**: For you searches from SMU until you change it. Tap **Change**
+  to use your phone's location, search a place, MRT station or postcode (OneMap),
+  or pick an area, and choose a 10, 20 or 30-minute walk. The choice stays in your
+  browser; it's never saved to your account.
+- **Find me a restaurant**: the ten best matches within that walk. Each
   one has a match score, a confidence level and "why" chips explaining the score.
 - **Surprise me**: one pick from a cuisine your Taste DNA hasn't explored yet.
-- **Live context**: when data.gov.sg forecasts rain, the feed re-ranks towards
+- **Live context**: when data.gov.sg forecasts rain where you are, the feed re-ranks towards
   sheltered venues. Venues closed right now drop out, with the reason shown.
 - **Dietary dealbreakers**: if you eat halal, you only see venues our data tags
   halal. If you're vegetarian or vegan, meat-only places (steakhouses, BBQ, chicken
@@ -52,11 +56,7 @@ avatar, and the logo appears on a splash screen while your session loads.
   get places scored for everyone at once (see below).
 - **Review**: search every venue, pick a dish (or add one the menu is missing)
   and rate it. You give it a sentiment, settle up to three head-to-head duels
-  against dishes you've already ranked, and can add a written review. Your
-  **Makan Pet** is a baby otter that grows with daily review streaks; miss a day
-  and it faints until your next review wakes it up. It grows after 7, 21 and 42
-  consecutive review days. Use **Next day** on the pet card to test streaks and
-  missed days; **Reset test** starts the pet over.
+  against dishes you've already ranked, and can add a written review.
 - **Taste DNA**: the learned profile, with six taste dimensions, per-cuisine
   affinities and a model-accuracy meter that climbs as its predictions improve.
 - **Me**: display name, username, password and dietary needs (restrictions,
