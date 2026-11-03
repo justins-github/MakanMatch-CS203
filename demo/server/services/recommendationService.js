@@ -2,7 +2,7 @@
 // personalised venue search.
 import { createChangeExplainer, factsFor, templateExplanation } from '../changeExplainer.js'
 import { applyDietary, vegetarianBoost } from '../dietary.js'
-import { MAX_WALK_MIN } from '../geo.js'
+import { DEFAULT_WALK_MIN, SMU, nearestArea, venuesNear, walkMinutes } from '../geo.js'
 import { AIMED_FLOOR, groupFind, groupSurprise } from '../groupMatch.js'
 import { applyOpeningHours } from '../hours.js'
 import { pickSurprise, priceLevel, rankVenues } from '../match.js'
@@ -15,8 +15,6 @@ const CLOSED = new Set(['CLOSED', 'TEMPORARILY_CLOSED'])
 export function createRecommendationService({
   registry, vectors, learners, catalog, accounts, explainer = createChangeExplainer({ ai: null }), now = () => new Date(),
 }) {
-  const walkable = registry.venues.filter((v) => v.distanceMin <= MAX_WALK_MIN)
-
   // Owner reports are a live signal; if the catalog is down we still recommend, and say so.
   async function ownerReports() {
     try {
@@ -114,7 +112,8 @@ export function createRecommendationService({
   return {
     // mode: 'find' (top 10) | 'surprise' (one experimental pick, skipping `exclude`).
     // withIds: kakis eating with the caller; account-service checks they are kakis.
-    async recommend(user, { mode, mood, context, exclude = [], withIds = [] }) {
+    // Only venues within `walkMin` of `from` (the caller's spot, for the whole table) count.
+    async recommend(user, { mode, mood, context, exclude = [], withIds = [], from = SMU, walkMin = DEFAULT_WALK_MIN }) {
       const kakis = withIds.length > 0 ? await accounts.party(user.token, withIds) : []
       const me = { id: user.id, name: user.me.displayName, restrictions: user.me.dietary?.restrictions ?? [] }
       const people = [me, ...kakis.map((k) => ({ id: k.id, name: k.displayName, restrictions: k.restrictions ?? [] }))]
@@ -123,7 +122,8 @@ export function createRecommendationService({
         ownerReports(), openingHours(), learners.read(me.id, me.name), livePrices(),
       ])
       const visits = lastVisitsByVenue(mine.reviews)
-      const { open: notClosed, closed } = applyOwnerReports(withLivePrices(walkable, prices), reports.byVenue)
+      const nearby = venuesNear(registry.venues, from, walkMin)
+      const { open: notClosed, closed } = applyOwnerReports(withLivePrices(nearby, prices), reports.byVenue)
       const { open, shutNow } = applyOpeningHours(notClosed, hours, now())
       // Halal and vegetarian are dealbreakers for anyone at the table.
       const { allowed, dropped } = applyDietary(open, people.map((p) => p.restrictions))
@@ -131,6 +131,7 @@ export function createRecommendationService({
         context,
         mood,
         mode,
+        near: { area: nearestArea(from), walkMin },
         ownerReports: { available: reports.available, closedNearby: closedYourPlacesFirst(closed, visits), shutNow },
         dietary: { dropped },
       }
@@ -184,12 +185,13 @@ export function createRecommendationService({
       return explanationFor(key, scope, { venueName: venue.name, changes, match, profile: mine.profile })
     },
 
-    async search(user, query, limit) {
+    // Match % includes the walk from `from`, so it agrees with the feed's.
+    async search(user, query, limit, from = SMU) {
       const [state, prices] = await Promise.all([learners.read(user.id, user.me.displayName), livePrices()])
       const yours = yourScoresByVenue(state.reviews)
       const results = searchVenues(registry.searchIndex, query, {
         limit,
-        scoreFn: (venue) => rankVenues(withLivePrices([venue], prices), state.profile)[0].matchScore,
+        scoreFn: (venue) => rankVenues(withLivePrices([withWalkFrom(from, venue)], prices), state.profile)[0].matchScore,
       })
       return results.map(({ venue, matchScore, highlight }) => ({
         id: venue.id,
@@ -197,7 +199,7 @@ export function createRecommendationService({
         area: venue.area ?? null,
         address: venue.address ?? null,
         cuisine: venue.cuisine ?? null,
-        distanceMin: venue.distanceMin,
+        distanceMin: withWalkFrom(from, venue).distanceMin ?? null,
         matchScore,
         yourScore: yours.get(venue.id) ?? null,
         highlight,
@@ -205,6 +207,9 @@ export function createRecommendationService({
     },
   }
 }
+
+// The venue with its walk time from `from`, when it has coordinates.
+const withWalkFrom = (from, venue) => (venue.lat == null || venue.lon == null ? venue : { ...venue, distanceMin: walkMinutes(from, venue) })
 
 // What owners report changes what diners see: closed venues drop out (and are
 // listed so the UI can say why), and a venue that moved shows its new address

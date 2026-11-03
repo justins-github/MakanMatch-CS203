@@ -4,7 +4,6 @@ import { readFileSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { cuisineForCategories } from './cuisines.js'
-import { walkMinutesFromSmu } from './geo.js'
 import { buildSearchIndex, normalizeName } from './search.js'
 
 const DAY_MS = 86_400_000
@@ -25,7 +24,6 @@ function fromOverture(row, now) {
     website: row.website ?? null,
     social: row.social ?? null,
     brand: row.brand ?? null,
-    distanceMin: walkMinutesFromSmu(row.lat, row.lon),
     overtureConfidence: row.confidence,
     dataAgeDays: row.updatedAt
       ? Math.max(0, Math.floor((now - Date.parse(row.updatedAt)) / DAY_MS))
@@ -52,7 +50,7 @@ export function buildRegistry(overtureRows, seeds, now = Date.now()) {
     const matchIdx = indices.find((i) => !consumed.has(i))
     if (matchIdx === undefined) {
       unmatched.push(seed.name)
-      return { ...seed, source: 'community' }
+      return { ...seed, lat: seed.latitude ?? null, lon: seed.longitude ?? null, source: 'community' }
     }
     consumed.add(matchIdx)
     const ov = pool[matchIdx]
@@ -62,7 +60,6 @@ export function buildRegistry(overtureRows, seeds, now = Date.now()) {
       gersId: ov.gersId,
       lat: ov.lat,
       lon: ov.lon,
-      distanceMin: ov.distanceMin, // real geometry beats the authored guess
       overtureConfidence: ov.overtureConfidence,
       source: 'community+overture',
     }

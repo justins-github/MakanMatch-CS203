@@ -76,8 +76,11 @@ function scoreVenue(venue, user, context) {
     if (sim >= 0.75) why.push("Similar to places you've rated well")
   }
 
-  score -= Math.min(12, venue.distanceMin * 0.8)
-  why.push(`${venue.distanceMin} min walk`)
+  // Distance is from where the user is; a request without one scores taste alone.
+  if (venue.distanceMin != null) {
+    score -= Math.min(12, venue.distanceMin * 0.8)
+    why.push(`${venue.distanceMin} min walk`)
+  }
 
   if (hasCuisine && user.recentlyEaten.includes(venue.cuisine)) {
     score -= 15
@@ -89,7 +92,7 @@ function scoreVenue(venue, user, context) {
       score += 10
       why.push('Sheltered - good in this rain')
     } else if (venue.sheltered === false) {
-      score -= Math.min(8, venue.distanceMin)
+      score -= Math.min(8, venue.distanceMin ?? 0)
       why.push('Exposed walk in the rain')
     }
   }
