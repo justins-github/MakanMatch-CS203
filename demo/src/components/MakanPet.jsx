@@ -224,7 +224,16 @@ function displayDate(date) {
   }).format(new Date(Date.UTC(year, month - 1, day)))
 }
 
-export default function MakanPet({ pet, today, simulator, onCare, onNextDay, onResetSimulator }) {
+export default function MakanPet({
+  pet,
+  today,
+  simulator,
+  minimized,
+  onToggleMinimized,
+  onCare,
+  onNextDay,
+  onResetSimulator,
+}) {
   const missedDay = pet.lastReviewDate && daysBetween(today, pet.lastReviewDate) > 1
   const fainted = Boolean(missedDay)
   const stage = stageFor(pet.streak)
@@ -238,7 +247,7 @@ export default function MakanPet({ pet, today, simulator, onCare, onNextDay, onR
         : 'Make your first review to meet Makan and start a streak.'
 
   return (
-    <section className={`makan-pet ${fainted ? 'is-fainted' : ''}`} aria-label="Makan Pet">
+    <section className={`makan-pet${fainted ? ' is-fainted' : ''}${minimized ? ' is-minimized' : ''}`} aria-label="Makan Pet">
       <div className="makan-pet-picture">
         <Otter stage={stage} fainted={fainted} />
       </div>
@@ -258,6 +267,16 @@ export default function MakanPet({ pet, today, simulator, onCare, onNextDay, onR
           <small>{progress.label}</small>
         </div>
       </div>
+      <button
+        type="button"
+        className="makan-pet-toggle"
+        onClick={onToggleMinimized}
+        aria-expanded={!minimized}
+        aria-label={minimized ? 'Expand Makan Pet' : 'Minimize Makan Pet'}
+        title={minimized ? 'Expand pet' : 'Minimize pet'}
+      >
+        {minimized ? '⌄' : '⌃'}
+      </button>
       {onCare && (
         <button type="button" className="makan-pet-care" onClick={onCare} aria-label="Review a dish to care for Makan">
           Review

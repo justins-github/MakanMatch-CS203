@@ -312,6 +312,260 @@ body {
   }
 }
 
+/* ---------- Makan Pet ---------- */
+
+.makan-pet {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 4px 12px;
+  padding: 7px 9px;
+  border: 1.5px solid var(--ink);
+  border-radius: 10px;
+  background: #fff3cc;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.makan-pet.is-fainted {
+  background: var(--monsoon-wash);
+}
+
+.makan-pet-picture {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+}
+
+.makan-pet-art {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transition: opacity 200ms ease;
+}
+
+.makan-pet-art[data-stage='baby'] { transform: scale(.78); }
+.makan-pet-art[data-stage='little'] { transform: scale(.88); }
+.makan-pet-art[data-stage='growing'] { transform: scale(.96); }
+.makan-pet-art[data-stage='grown'] { transform: scale(1.05); }
+.makan-pet-art.fainted { opacity: .7; }
+
+.makan-pet-info {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+}
+
+.makan-pet-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+}
+
+.makan-pet-eyebrow {
+  color: var(--ink-soft);
+  font-family: var(--font-data);
+  font-size: 8px;
+  letter-spacing: .06em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.makan-pet h2 {
+  display: inline;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.1;
+}
+
+.makan-pet-streak {
+  flex: none;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  padding: 1px 5px;
+  font-family: var(--font-data);
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.makan-pet-info p {
+  overflow: hidden;
+  margin: 2px 0;
+  font-size: 10px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.makan-pet-progress {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.makan-pet-progress > span {
+  flex: 1;
+  height: 4px;
+  min-width: 20px;
+  overflow: hidden;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+}
+
+.makan-pet-progress i {
+  display: block;
+  height: 100%;
+  background: var(--pandan);
+}
+
+.makan-pet-progress small {
+  color: var(--ink-soft);
+  font-family: var(--font-data);
+  font-size: 8px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.makan-pet-care {
+  grid-column: 3;
+  grid-row: 2;
+  justify-self: end;
+  appearance: none;
+  border: 1px solid var(--ink);
+  border-radius: 6px;
+  background: var(--kunyit);
+  padding: 3px 6px;
+  color: var(--ink);
+  font: 600 9px var(--font-body);
+  cursor: pointer;
+}
+
+.makan-pet-care:focus-visible,
+.makan-pet-simulator button:focus-visible,
+.makan-pet-toggle:focus-visible {
+  outline: 2px solid var(--monsoon);
+  outline-offset: 1px;
+}
+
+.makan-pet-toggle {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink);
+  font: 600 13px/1 var(--font-body);
+  cursor: pointer;
+}
+
+.makan-pet-simulator {
+  grid-column: 2 / 3;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: var(--ink-soft);
+  font-family: var(--font-data);
+  font-size: 8px;
+  line-height: 1;
+}
+
+.makan-pet-simulator > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.makan-pet-simulator > div {
+  display: flex;
+  flex: none;
+  gap: 3px;
+}
+
+.makan-pet-simulator button {
+  appearance: none;
+  border: 1px solid var(--ink);
+  border-radius: 5px;
+  background: var(--paper);
+  padding: 3px 4px;
+  color: var(--ink);
+  font: 600 8px var(--font-body);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.makan-pet-simulator button:first-child {
+  background: var(--kunyit);
+}
+
+.makan-pet-error {
+  grid-column: 1 / -1;
+  color: var(--chili);
+  font-size: 9px;
+}
+
+.makan-pet.is-minimized {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto;
+  gap: 0 8px;
+  padding-block: 5px;
+}
+
+.makan-pet.is-minimized .makan-pet-picture,
+.makan-pet.is-minimized .makan-pet-info p,
+.makan-pet.is-minimized .makan-pet-progress,
+.makan-pet.is-minimized .makan-pet-care,
+.makan-pet.is-minimized .makan-pet-simulator,
+.makan-pet.is-minimized .makan-pet-error {
+  display: none;
+}
+
+.makan-pet.is-minimized .makan-pet-info {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.makan-pet.is-minimized .makan-pet-heading {
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.makan-pet.is-minimized .makan-pet-eyebrow {
+  display: none;
+}
+
+.makan-pet.is-minimized .makan-pet h2 {
+  font: 600 11px var(--font-body);
+}
+
+.makan-pet.is-minimized .makan-pet-toggle {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .makan-pet-art {
+    transition: none;
+  }
+}
+
 /* ---------- feed ---------- */
 
 .feed {
