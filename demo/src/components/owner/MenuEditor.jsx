@@ -7,7 +7,7 @@ import PriceListEditor from './PriceListEditor.jsx'
 const money = (v) => (v == null ? null : `$${Number(v).toFixed(2)}`)
 const SOURCE = { OWNER: 'official', DINER: 'added by a diner', SEED: 'from our starter data' }
 
-function DishRow({ dish, onChanged }) {
+function DishRow({ dish, onChanged, onRemoved }) {
   const [price, setPrice] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
@@ -27,6 +27,11 @@ function DishRow({ dish, onChanged }) {
   }
 
   const setOfficial = (value) => run(() => reportPrice(dish.id, Number(value)))
+  const remove = () =>
+    run(async () => {
+      await updateDish(dish.id, { archived: true })
+      onRemoved(dish)
+    })
 
   const aside = (
     <>
@@ -69,7 +74,7 @@ function DishRow({ dish, onChanged }) {
           <button type="button" className="btn go" disabled={!price || busy} onClick={() => setOfficial(price)}>
             Set price
           </button>
-          <button type="button" className="btn quiet" disabled={busy} onClick={() => run(() => updateDish(dish.id, { archived: true }))}>
+          <button type="button" className="btn quiet" disabled={busy} onClick={remove}>
             Remove
           </button>
         </div>
@@ -92,11 +97,29 @@ export default function MenuEditor({ venueId }) {
   const [editing, setEditing] = useState(false)
   const [scan, setScan] = useState(null) // { sample, dishes, photoUrl } while checking a menu photo
   const [savedNote, setSavedNote] = useState(null)
+  const [removed, setRemoved] = useState([]) // dishes removed on this visit, each with its Undo
 
   const load = () =>
     getMenu(venueId)
       .then(setDishes)
       .catch((err) => setError(err.message))
+
+  const dropUndo = (dish) => setRemoved((list) => list.filter((d) => d.id !== dish.id))
+
+  const putBack = async (dish) => {
+    setBusy(true)
+    setError(null)
+    try {
+      await updateDish(dish.id, { archived: false })
+      dropUndo(dish)
+      await load()
+    } catch (err) {
+      setError(err.message)
+      if (err.status === 409) dropUndo(dish) // its name is on the menu again, so Undo can't work
+    } finally {
+      setBusy(false)
+    }
+  }
 
   // The photo preview is an object URL; let it go once the scan is done with.
   useEffect(() => () => scan?.photoUrl && URL.revokeObjectURL(scan.photoUrl), [scan])
@@ -173,6 +196,14 @@ export default function MenuEditor({ venueId }) {
         </>
       )}
       {savedNote && <div className="ok-note">{savedNote}</div>}
+      {removed.map((d) => (
+        <div key={d.id} className="removed-note" role="status">
+          <span className="ok-note">Removed {d.name}. Diners no longer see it.</span>
+          <button type="button" className="btn quiet" disabled={busy} onClick={() => putBack(d)}>
+            Undo
+          </button>
+        </div>
+      ))}
       {conflicts > 0 && (
         <p className="panel-note">
           {conflicts === 1 ? '1 dish has' : `${conflicts} dishes have`} a price diners disagree with.
@@ -184,7 +215,7 @@ export default function MenuEditor({ venueId }) {
         <Accordion>
           <ul className="fold-list">
             {dishes.map((d) => (
-              <DishRow key={d.id} dish={d} onChanged={load} />
+              <DishRow key={d.id} dish={d} onChanged={load} onRemoved={(dish) => setRemoved((list) => [...list, dish])} />
             ))}
           </ul>
         </Accordion>

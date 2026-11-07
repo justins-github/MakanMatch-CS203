@@ -23,7 +23,7 @@ export const config = {
   ai: {
     apiKey: env.ANTHROPIC_API_KEY || null,
     model: env.AI_MODEL || 'claude-haiku-5-5',
-    timeoutMs: Number(env.AI_TIMEOUT_MS ?? 6000),
+    timeoutMs: Number(env.AI_TIMEOUT_MS ?? 10000),
   },
 }
 

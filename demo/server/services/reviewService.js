@@ -1,7 +1,8 @@
 // The review flow for one user: a venue's dishes with the AI's predictions, the
 // user's rankings, and posting reviews (which retrain their Taste DNA).
 // Dishes and prices belong to catalog-service; this service keeps the taste
-// features the AI needs (curated for seed dishes, neutral for everything else).
+// features the AI needs (curated for seed dishes; null for everything else, which
+// Claude estimates when a review needs it).
 import { badRequest, conflict, forbidden, notFound } from '../errors.js'
 import {
   REVIEW_TAGS,
@@ -13,6 +14,7 @@ import {
   priceTierFor,
   undoLatestReview,
 } from '../learn.js'
+import { createDishEstimator } from '../dishEstimator.js'
 import { createReviewReader } from '../reviewReader.js'
 import { learnedVector } from './tasteVectors.js'
 
@@ -20,7 +22,10 @@ const round1 = (v) => Math.round(v * 10) / 10
 const numberOrNull = (v) => (v == null || v === '' ? null : Number(v))
 
 // `reader` reads review text (reviewReader.js); without one, keywords do it.
-export function createReviewService({ registry, learners, catalog, seedDishes, vectors, reader = createReviewReader({ ai: null }) }) {
+// `estimator` estimates uncurated dishes (dishEstimator.js); without one they stay unknown.
+export function createReviewService({
+  registry, learners, catalog, seedDishes, vectors, reader = createReviewReader({ ai: null }), estimator = createDishEstimator({ ai: null }),
+}) {
   const seedById = new Map(seedDishes.map((d) => [d.id, d]))
   const seedAsCatalogDish = (s) => ({ id: s.id, venueId: s.venueId, name: s.name, price: s.price, source: 'SEED' })
 
@@ -34,9 +39,9 @@ export function createReviewService({ registry, learners, catalog, seedDishes, v
       name: d.name,
       price,
       priceTier: seed?.priceTier ?? priceTierFor(price),
-      spice: seed?.spice ?? 0.5,
-      richness: seed?.richness ?? 0.5,
-      novelty: seed?.novelty ?? 0.6,
+      spice: seed?.spice ?? null,
+      richness: seed?.richness ?? null,
+      novelty: seed?.novelty ?? null,
       tags: seed?.tags ?? [],
       source: d.source ?? 'SEED',
       officialPrice: numberOrNull(d.officialPrice),
@@ -79,7 +84,12 @@ export function createReviewService({ registry, learners, catalog, seedDishes, v
     return found
   }
 
-  const withCuisine = (dish) => ({ ...dish, cuisine: registry.venueById.get(dish.venueId)?.cuisine ?? null })
+  const withCuisine = (dish) => ({ ...dish, cuisine: dish.cuisine ?? registry.venueById.get(dish.venueId)?.cuisine ?? null })
+
+  // Dish id -> Claude's estimate of it, for the dishes it has something to say about.
+  async function estimatesFor(dishes) {
+    return new Map(await Promise.all(dishes.map(async (d) => [d.id, await estimator.estimate(d, registry.venueById.get(d.venueId))])))
+  }
   const manages = (user, venueId) => (user.me.ownedVenues ?? []).some((v) => v.venueId === venueId)
 
   function venueOf(dish) {
@@ -164,23 +174,31 @@ export function createReviewService({ registry, learners, catalog, seedDishes, v
       const venue = venueOf(dish)
       assertMayReview(user, dish)
 
-      // Read the text before taking the learning lock, so a slow AI answer
-      // doesn't hold up this user's other writes.
-      const { profile } = await learners.read(user.id, user.me.displayName)
-      const reading = await reader.read({ text, dish, venue, sentiment, profile })
-
-      return learn(user, async (state) => {
-        const opponentIds = [...new Set(duels.flatMap((d) => [d?.winnerId, d?.loserId]))].filter((id) => id && id !== dish.id)
-        const known = await findRankedDishes(state, opponentIds)
-        known.set(dish.id, dish)
-        const resolved = duels.map(({ winnerId, loserId } = {}) => {
-          const winner = known.get(winnerId)
-          const loser = known.get(loserId)
-          if (!winner || !loser) throw badRequest('duel references an unknown dish')
-          return { winner: withCuisine(winner), loser: withCuisine(loser) }
-        })
-        return applyBeliReview(state, dish, venue, { sentiment, duels: resolved, insertIndex, text, reading })
+      const before = await learners.read(user.id, user.me.displayName)
+      const opponentIds = [...new Set(duels.flatMap((d) => [d?.winnerId, d?.loserId]))].filter((id) => id && id !== dish.id)
+      const known = await findRankedDishes(before, opponentIds)
+      known.set(dish.id, dish)
+      const pairs = duels.map(({ winnerId, loserId } = {}) => {
+        const winner = known.get(winnerId)
+        const loser = known.get(loserId)
+        if (!winner || !loser) throw badRequest('duel references an unknown dish')
+        return { winner, loser }
       })
+
+      // Ask Claude before taking the learning lock, so a slow answer doesn't hold
+      // up this user's other writes.
+      const [reading, estimates] = await Promise.all([
+        reader.read({ text, dish, venue, sentiment, profile: before.profile }),
+        estimatesFor([...known.values()]),
+      ])
+      // A duel takes only the cuisine from an estimate. Comparing two dishes' spice or
+      // richness needs curated values: the gap would be mostly the estimate's own error,
+      // and "preferred it" doesn't say the spice was why.
+      const inDuel = (d) => withCuisine({ ...d, cuisine: estimates.get(d.id)?.cuisine })
+      const resolved = pairs.map(({ winner, loser }) => ({ winner: inDuel(winner), loser: inDuel(loser) }))
+
+      return learn(user, async (state) =>
+        applyBeliReview(state, dish, venue, { sentiment, duels: resolved, insertIndex, text, reading, estimate: estimates.get(dish.id) }))
     },
 
     // Undo (CSD-54): takes back what the AI learned from the review just posted,

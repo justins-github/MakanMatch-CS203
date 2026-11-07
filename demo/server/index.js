@@ -11,6 +11,7 @@ import { createAiClient } from './clients/aiClient.js'
 import { createChangeExplainer } from './changeExplainer.js'
 import { createCatalogClient } from './clients/catalogClient.js'
 import { createOneMapClient } from './clients/oneMapClient.js'
+import { createDishEstimator } from './dishEstimator.js'
 import { migrate } from './db/migrate.js'
 import { openDatabase } from './db/pool.js'
 import { errorHandler } from './errors.js'
@@ -67,7 +68,9 @@ const catalog = createCatalogClient({ baseUrl: config.catalogServiceUrl })
 const recommendations = createRecommendationService({
   registry, vectors, learners, catalog, accounts, explainer: createChangeExplainer({ ai }),
 })
-const reviews = createReviewService({ registry, learners, catalog, seedDishes, vectors, reader: createReviewReader({ ai }) })
+const reviews = createReviewService({
+  registry, learners, catalog, seedDishes, vectors, reader: createReviewReader({ ai }), estimator: createDishEstimator({ ai }),
+})
 const profiles = createProfileService({ learners, summaries: createSummaryWriter({ ai }) })
 const authenticated = requireAuth({
   verifyToken: createTokenVerifier({ supabaseUrl: config.supabaseUrl, jwtSecret: config.jwtSecret }),

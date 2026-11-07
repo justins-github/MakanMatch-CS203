@@ -164,6 +164,18 @@ test('pickSurprise honors exclusions and never picks unknown-cuisine venues', ()
   assert.equal(none, null)
 })
 
+test('taking back the last skip returns the same surprise, which is how "Previous pick" works', () => {
+  const venues = ['ethiopian', 'burmese', 'turkish'].map((cuisine) => makeBare({ id: cuisine, cuisine }))
+  const pick = (skipped) => pickSurprise(venues, DEMO_USER, CTX, skipped).id
+  const first = pick([])
+  const second = pick([first])
+  const third = pick([first, second])
+  assert.equal(new Set([first, second, third]).size, 3, 'three different picks')
+  assert.equal(pick([first, second, third].slice(0, 2)), third)
+  assert.equal(pick([first, second].slice(0, 1)), second)
+  assert.equal(pick([first].slice(0, 0)), first)
+})
+
 // --- taste-vector similarity term ---------------------------------------------
 import { createStore, quantise } from './vectors.js'
 

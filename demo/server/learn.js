@@ -20,6 +20,7 @@ const DELTA_MIN = 0.0049 // smallest change worth reporting
 const clamp01 = (v) => Math.min(1, Math.max(0, v))
 const round1 = (v) => Math.round(v * 10) / 10
 const round2 = (v) => Math.round(v * 100) / 100
+const aOrAn = (word) => (/^[aeiou]/i.test(word) ? 'an' : 'a')
 
 export const REVIEW_TAGS = ['too-spicy', 'too-heavy', 'worth-it', 'too-pricey']
 export const SENTIMENTS = ['loved', 'fine', 'disliked']
@@ -56,8 +57,11 @@ export function priceTierFor(price) {
   return p >= 12 ? 2 : p > 6 ? 1 : 0
 }
 
+// A review you undid and then redid was replaced, so only the redo counts.
+const wasRedone = (r, i, reviews) => r.undone && reviews.slice(i + 1).some((later) => later.dishId === r.dishId)
+
 export function getAccuracy(state) {
-  const errors = state.reviews.map((r) => Math.abs(r.predicted - r.actual))
+  const errors = state.reviews.filter((r, i, all) => !wasRedone(r, i, all)).map((r) => Math.abs(r.predicted - r.actual))
   const count = errors.length
   const running = count
     ? Math.round(100 - errors.reduce((a, b) => a + b, 0) / count)
@@ -66,11 +70,12 @@ export function getAccuracy(state) {
 }
 
 // Predicts how much the user will like a dish (0-100) from the profile alone.
+// A dish whose spice or richness isn't known scores as a middling one.
 export function predictDishScore(dish, cuisine, profile) {
   let score = 50
   score += 25 * (profile.cuisineAffinity[cuisine] ?? 0.3)
-  score += 15 * (1 - Math.abs(dish.spice - profile.spicePref))
-  score += 10 * (1 - Math.abs(dish.richness - profile.richnessPref))
+  score += 15 * (1 - Math.abs((dish.spice ?? 0.5) - profile.spicePref))
+  score += 10 * (1 - Math.abs((dish.richness ?? 0.5) - profile.richnessPref))
   score -= 8 * Math.max(0, dish.priceTier - profile.priceComfort)
   return Math.round(Math.min(99, Math.max(5, score)))
 }
@@ -106,12 +111,14 @@ function makeToucher() {
 
 // Nudges the profile from a 1-5 rating and optional tags. A rating only says how
 // much you liked the dish, so its spice/richness/price/novelty nudges are guesses
-// at why: `skip` drops the guess on dimensions your own words covered, and
+// at why: `skip` drops the guess on what your own words covered (by touch key), and
 // `cuisineScale` shrinks the cuisine nudge when you blamed something specific.
+// A dish with unknown spice or richness (not curated, not estimated) offers no guess.
 function collectRatingNudges(profile, dish, cuisine, rating, tags, touch, { skip = new Set(), cuisineScale = 1, blamedQuote } = {}) {
   const signal = (rating - 3) / 2 // -1 .. +1
+  const source = dish.estimated ? ' (estimated from the dish name)' : ''
 
-  if (cuisine != null && !skip.has('cuisine')) {
+  if (cuisine != null && !skip.has('affinity-' + cuisine)) {
     const label = cuisine.replace(/-/g, ' ')
     const from = profile.cuisineAffinity[cuisine] ?? 0.3
     const target = clamp01(0.5 + signal * 0.5)
@@ -120,30 +127,30 @@ function collectRatingNudges(profile, dish, cuisine, rating, tags, touch, { skip
     touch('affinity-' + cuisine, `${label} affinity`, from, to,
       cuisineScale < 1
         ? `you ${signal > 0 ? 'credited' : 'blamed'} "${blamedQuote}", not the cuisine`
-        : `${rating}★ on a ${label} dish`)
+        : `${rating}★ on ${aOrAn(label)} ${label} dish`)
   }
 
-  if (signal !== 0 && !skip.has('spice')) {
+  if (signal !== 0 && dish.spice != null && !skip.has('spice')) {
     const sp = profile.spicePref
     const spTo = clamp01(sp + ALPHA * signal * (dish.spice - sp))
     if (spTo !== sp) {
       profile.spicePref = spTo
       touch('spice', 'Spice', sp, spTo,
         signal > 0
-          ? `you enjoyed something ${dish.spice > sp ? 'spicier' : 'milder'} than your usual`
-          : `you disliked something ${dish.spice > sp ? 'spicier' : 'milder'} than your usual`)
+          ? `you enjoyed something ${dish.spice > sp ? 'spicier' : 'milder'} than your usual${source}`
+          : `you disliked something ${dish.spice > sp ? 'spicier' : 'milder'} than your usual${source}`)
     }
   }
 
-  if (signal !== 0 && !skip.has('richness')) {
+  if (signal !== 0 && dish.richness != null && !skip.has('richness')) {
     const ri = profile.richnessPref
     const riTo = clamp01(ri + ALPHA * signal * (dish.richness - ri))
     if (riTo !== ri) {
       profile.richnessPref = riTo
       touch('richness', 'Richness', ri, riTo,
         signal > 0
-          ? `you enjoyed something ${dish.richness > ri ? 'heartier' : 'lighter'} than your usual`
-          : `you disliked something ${dish.richness > ri ? 'heartier' : 'lighter'} than your usual`)
+          ? `you enjoyed something ${dish.richness > ri ? 'heartier' : 'lighter'} than your usual${source}`
+          : `you disliked something ${dish.richness > ri ? 'heartier' : 'lighter'} than your usual${source}`)
     }
   }
 
@@ -183,27 +190,30 @@ function collectRatingNudges(profile, dish, cuisine, rating, tags, touch, { skip
   }
 }
 
+// How much more of a feature the winner has; no comparison if either is unknown.
+const featureGap = (winner, loser) => (winner == null || loser == null ? 0 : winner - loser)
+
 // Pulls the profile toward each duel winner's features.
 function collectDuelNudges(profile, duels, touch) {
   for (const { winner, loser } of duels) {
     const reason = `you preferred ${winner.name} over ${loser.name}`
 
     const sp = profile.spicePref
-    const spTo = clamp01(sp + DUEL_ALPHA * (winner.spice - loser.spice))
+    const spTo = clamp01(sp + DUEL_ALPHA * featureGap(winner.spice, loser.spice))
     if (spTo !== sp) {
       profile.spicePref = spTo
       touch('spice', 'Spice', sp, spTo, reason)
     }
 
     const ri = profile.richnessPref
-    const riTo = clamp01(ri + DUEL_ALPHA * (winner.richness - loser.richness))
+    const riTo = clamp01(ri + DUEL_ALPHA * featureGap(winner.richness, loser.richness))
     if (riTo !== ri) {
       profile.richnessPref = riTo
       touch('richness', 'Richness', ri, riTo, reason)
     }
 
     const adv = profile.adventurousness
-    const advTo = clamp01(adv + DUEL_ALPHA * (winner.novelty - loser.novelty))
+    const advTo = clamp01(adv + DUEL_ALPHA * featureGap(winner.novelty, loser.novelty))
     if (advTo !== adv) {
       profile.adventurousness = advTo
       touch('adventurousness', 'Adventurousness', adv, advTo, reason)
@@ -253,22 +263,27 @@ function cuisineTarget(cuisine) {
 
 const targetFor = (dimension, cuisine) => (dimension === 'cuisine' ? cuisineTarget(cuisine) : TEXT_TARGETS[dimension])
 
-// What the review's signals would move, per dimension: strength x evidence
-// (repeats across your reviews compound), summed, then capped per review.
+// The cuisine a signal is about: the one it names, or else the venue's.
+const cuisineOf = (signal, venue) => signal.cuisine ?? venue.cuisine
+
+// What the review's signals would move, per touch key (so each cuisine is its own):
+// strength x evidence (repeats across your reviews compound), summed, then capped
+// per review.
 function textMoves(state, reading, venue) {
   const past = pastEvidence(state.reviews)
   const moves = new Map()
   for (const s of reading.signals) {
-    if (s.dimension === 'cuisine' && venue.cuisine == null) continue
-    const target = targetFor(s.dimension, venue.cuisine)
+    const cuisine = cuisineOf(s, venue)
+    if (s.dimension === 'cuisine' && cuisine == null) continue
+    const target = targetFor(s.dimension, cuisine)
     if (!target) continue
-    const n = 1 + past.filter((keys) => keys.has(evidenceKey(s, venue.cuisine))).length
+    const n = 1 + past.filter((keys) => keys.has(evidenceKey(s, cuisine))).length
     const sign = s.direction === 'up' ? 1 : -1
-    const move = moves.get(s.dimension) ?? { target, amount: 0, quotes: [], n: 1 }
+    const move = moves.get(target.touchKey) ?? { target, amount: 0, quotes: [], n: 1 }
     move.amount += sign * STRENGTH_STEP[s.strength] * Math.min(n, EVIDENCE_MAX) * (target.scale ?? 1)
     move.quotes.push(`"${s.quote}"`)
     move.n = Math.max(move.n, n)
-    moves.set(s.dimension, move)
+    moves.set(target.touchKey, move)
   }
   for (const move of moves.values()) {
     const cap = TEXT_CAP * (move.target.scale ?? 1)
@@ -278,16 +293,12 @@ function textMoves(state, reading, venue) {
   return moves
 }
 
-// How far the rating's guesses would move each dimension, without moving anything.
+// How far the rating's guesses would move each touch key, without moving anything.
 function guessedMoves(profile, dish, cuisine, rating, options) {
   const trial = structuredClone(profile)
   collectRatingNudges(trial, dish, cuisine, rating, [], () => {}, options)
-  const guesses = new Map()
-  for (const dimension of [...Object.keys(TEXT_TARGETS), ...(cuisine != null ? ['cuisine'] : [])]) {
-    const target = targetFor(dimension, cuisine)
-    guesses.set(dimension, target.get(trial) - target.get(profile))
-  }
-  return guesses
+  const targets = [...Object.values(TEXT_TARGETS), ...(cuisine != null ? [cuisineTarget(cuisine)] : [])]
+  return new Map(targets.map((target) => [target.touchKey, target.get(trial) - target.get(profile)]))
 }
 
 // Star-rating entry point. Mutates `state`; `review` in the result is the new record.
@@ -321,44 +332,62 @@ export function applyReview(state, dish, venue, rating, tags = []) {
   }
 }
 
+// A dish with Claude's estimate of it filled in (dishEstimator.js). A curated value
+// always stays; no estimate leaves the dish as it was.
+export function withEstimate(dish, estimate) {
+  if (!estimate) return dish
+  return {
+    ...dish,
+    spice: dish.spice ?? estimate.spice,
+    richness: dish.richness ?? estimate.richness,
+    cuisine: estimate.cuisine ?? dish.cuisine,
+    estimated: true,
+  }
+}
+
 // Beli-style entry point; duels arrive resolved as { winner, loser } dishes with cuisine.
 // `reading` is the review text already read (reviewReader.js); without one the
-// keyword list reads `text` here.
-export function applyBeliReview(state, dish, venue, { sentiment, duels = [], insertIndex = 0, text = '', reading = keywordReading(text) }) {
+// keyword list reads `text` here. `estimate` is Claude's estimate of an uncurated dish.
+export function applyBeliReview(state, dish, venue, { sentiment, duels = [], insertIndex = 0, text = '', reading = keywordReading(text), estimate = null }) {
   if (!SENTIMENTS.includes(sentiment)) throw new Error(`invalid sentiment "${sentiment}"`)
   const profile = state.profile
   const profileBefore = structuredClone(profile) // what Undo puts back
-  const predicted = predictDishScore(dish, venue.cuisine, profile)
 
-  // On each dimension your words cover, they and the rating's guess are compared:
+  // The rating is about this dish, so its cuisine nudge goes to the dish's own cuisine
+  // when Claude could tell (a briyani at a Thai place is Indian), else the venue's.
+  const tasted = withEstimate(dish, estimate)
+  const ratedCuisine = tasted.cuisine ?? venue.cuisine
+  const predicted = predictDishScore(tasted, ratedCuisine, profile)
+
+  // On each thing your words cover, they and the rating's guess are compared:
   // pointing the same way, the bigger move wins; pointing different ways, your
   // words win; words that cancel out leave the guess alone. A specific blame
-  // softens the cuisine nudge unless the cuisine itself is what you talked about;
+  // softens the cuisine nudge unless that cuisine itself is what you talked about;
   // the blamed (or credited) words are the first non-cuisine ones Claude lists,
   // since it is asked to put those first.
   const { touch, deltas } = makeToucher()
   const rating = SENTIMENT_RATING[sentiment]
-  const aboutCuisine = reading.signals.some((s) => s.dimension === 'cuisine')
+  const aboutCuisine = reading.signals.some((s) => s.dimension === 'cuisine' && cuisineOf(s, venue) === ratedCuisine)
   const blamed = reading.signals.find((s) => s.dimension !== 'cuisine')
   const ratingOptions = {
     cuisineScale: reading.blame === 'specific' && blamed && !aboutCuisine ? BLAME_SCALE : 1,
     blamedQuote: blamed?.quote,
   }
   const words = textMoves(state, reading, venue)
-  const guesses = guessedMoves(profile, dish, venue.cuisine, rating, ratingOptions)
-  const wordsBeatGuess = (dimension, { amount }) => {
-    const guess = guesses.get(dimension) ?? 0
+  const guesses = guessedMoves(profile, tasted, ratedCuisine, rating, ratingOptions)
+  const wordsBeatGuess = (key, { amount }) => {
+    const guess = guesses.get(key) ?? 0
     if (amount === 0) return false
     return !(Math.sign(guess) === Math.sign(amount) && Math.abs(guess) > Math.abs(amount))
   }
-  const wordsWin = new Set([...words].filter(([dimension, move]) => wordsBeatGuess(dimension, move)).map(([dimension]) => dimension))
+  const wordsWin = new Set([...words].filter(([key, move]) => wordsBeatGuess(key, move)).map(([key]) => key))
 
-  collectRatingNudges(profile, dish, venue.cuisine, rating, [], touch, { ...ratingOptions, skip: wordsWin })
+  collectRatingNudges(profile, tasted, ratedCuisine, rating, [], touch, { ...ratingOptions, skip: wordsWin })
   collectDuelNudges(profile, duels, touch)
-  for (const [dimension, { target, amount, reason }] of words) {
+  for (const [key, { target, amount, reason }] of words) {
     const from = target.get(profile)
-    if (wordsWin.has(dimension)) target.set(profile, from + amount)
-    touch(target.touchKey, target.label, from, target.get(profile), reason)
+    if (wordsWin.has(key)) target.set(profile, from + amount)
+    touch(key, target.label, from, target.get(profile), reason)
   }
 
   // Re-reviewing moves the dish rather than duplicating it.
@@ -377,7 +406,7 @@ export function applyBeliReview(state, dish, venue, { sentiment, duels = [], ins
     sentiment,
     tags: [],
     text,
-    signals: reading.signals.map((s) => (s.dimension === 'cuisine' ? { ...s, cuisine: venue.cuisine } : s)),
+    signals: reading.signals.map((s) => (s.dimension === 'cuisine' ? { ...s, cuisine: cuisineOf(s, venue) } : s)),
     readBy: reading.readBy,
     profileBefore,
     score10,

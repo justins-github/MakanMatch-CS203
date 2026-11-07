@@ -13,6 +13,9 @@ export const DEFAULT_WALK_MIN = 20
 const SG = { minLat: 1.13, maxLat: 1.47, minLon: 103.59, maxLon: 104.1 }
 
 const WALK_METERS_PER_MIN = 80
+// Streets aren't straight: foot routes between 40 sampled venues and 10 spots across
+// Singapore (OpenStreetMap) ran a median 1.4x the straight line, so we allow for that.
+const ROUTE_DETOUR = 1.4
 
 // data.gov.sg's 47 two-hour forecast areas and their label points, kept on disk so
 // a spot can be named (and matched to its forecast) even when the API is down.
@@ -31,9 +34,10 @@ export function haversineKm(a, b) {
   return 2 * 6371 * Math.asin(Math.sqrt(h))
 }
 
-// Straight-line walk minutes between two points at 80 m/min (at least 1).
+// Estimated walk minutes between two points at 80 m/min (at least 1). An estimate from
+// the straight-line distance, not a route: a river or expressway can still add more.
 export function walkMinutes(from, to) {
-  return Math.max(1, Math.round((haversineKm(from, to) * 1000) / WALK_METERS_PER_MIN))
+  return Math.max(1, Math.round((haversineKm(from, to) * 1000 * ROUTE_DETOUR) / WALK_METERS_PER_MIN))
 }
 
 export function inSingapore({ lat, lon }) {
@@ -65,7 +69,7 @@ export function nearestArea(point) {
 // The venues within `walkMin` of `from`, each carrying its walk time from there.
 // Venues without coordinates can't be placed, so they never count as nearby.
 export function venuesNear(venues, from, walkMin) {
-  const reachKm = (walkMin * WALK_METERS_PER_MIN) / 1000
+  const reachKm = (walkMin * WALK_METERS_PER_MIN) / ROUTE_DETOUR / 1000
   // A cheap box check first; a degree of latitude is ~111 km.
   const dLat = reachKm / 111 + 0.001
   const dLon = dLat / Math.cos((from.lat * Math.PI) / 180)

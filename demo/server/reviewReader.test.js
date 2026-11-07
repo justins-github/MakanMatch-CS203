@@ -81,6 +81,7 @@ test('the prompt carries the dish, price, sentiment, profile and the text', asyn
   assert.ok(prompt.includes('<review>') && prompt.includes('</review>'))
   assert.ok(system.length > 0)
   assert.deepEqual([...schema.required].sort(), ['blame', 'signals'])
+  assert.ok(schema.properties.signals.items.required.includes('cuisine'))
 })
 
 test('quotes are matched loosely but never invented', async () => {
@@ -115,6 +116,34 @@ test('a cuisine signal needs a known venue cuisine', async () => {
   const cuisine = { blame: 'overall', signals: [{ dimension: 'cuisine', direction: 'down', strength: 2, quote: 'I hate the spice', why: '' }] }
   assert.equal((await read(fakeAi(cuisine), { venue: { ...VENUE, cuisine: null } })).signals.length, 0)
   assert.equal((await read(fakeAi(cuisine))).signals.length, 1)
+})
+
+const cuisineSignal = (cuisine) => ({ dimension: 'cuisine', direction: 'down', strength: 3, quote: 'I hate the spice', why: '', cuisine })
+
+test('a cuisine signal can name a cuisine other than the venue\'s', async () => {
+  const reading = await read(fakeAi({ blame: 'overall', signals: [cuisineSignal('thai')] }))
+  assert.deepEqual(reading.signals.map((s) => [s.dimension, s.cuisine]), [['cuisine', 'thai']])
+})
+
+test('a named cuisine survives at a venue with no cuisine', async () => {
+  const reading = await read(fakeAi({ blame: 'overall', signals: [cuisineSignal('thai')] }), { venue: { ...VENUE, cuisine: null } })
+  assert.deepEqual(reading.signals.map((s) => s.cuisine), ['thai'])
+})
+
+test('an unnamed or unknown cuisine falls back to the venue\'s, or is dropped without one', async () => {
+  for (const named of [null, 'martian']) {
+    const answer = { blame: 'overall', signals: [cuisineSignal(named)] }
+    assert.deepEqual((await read(fakeAi(answer))).signals.map((s) => s.cuisine), ['chicken-rice'])
+    assert.equal((await read(fakeAi(answer), { venue: { ...VENUE, cuisine: null } })).signals.length, 0)
+  }
+})
+
+test('only cuisine signals carry a cuisine', async () => {
+  const reading = await read(fakeAi({
+    blame: 'overall',
+    signals: [{ dimension: 'spice', direction: 'down', strength: 2, quote: 'I hate the spice', why: '', cuisine: 'thai' }],
+  }))
+  assert.equal('cuisine' in reading.signals[0], false)
 })
 
 test('no taste content: AI reads nothing, readBy still ai', async () => {

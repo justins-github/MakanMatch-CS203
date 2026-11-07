@@ -91,3 +91,14 @@ test('Surprise picks something new to the group from the places that pass, skipp
   assert.equal(groupSurprise(members, ['b']).venues[0].id, 'c')
   assert.deepEqual(groupSurprise(members, ['a', 'b', 'c']).venues, [])
 })
+
+test('taking back the last skip returns the same group surprise, which is how "Previous pick" works', () => {
+  const members = [
+    member('you', { a: 90, b: 82, c: 80 }, { novelty: { b: 0.9, c: 0.8 } }),
+    member('jh', { a: 88, b: 80, c: 79 }, { novelty: { b: 0.9, c: 0.7 } }),
+  ]
+  const first = groupSurprise(members).venues[0].id
+  const second = groupSurprise(members, [first]).venues[0].id
+  assert.notEqual(second, first)
+  assert.equal(groupSurprise(members, []).venues[0].id, first)
+})

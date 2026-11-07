@@ -189,6 +189,11 @@ public class MenuService {
 			}
 			dish.rename(name);
 		}
+		// Only one live dish can have a name, and it may have been re-added since this one was removed.
+		if (Boolean.FALSE.equals(request.archived()) && dish.isArchived()
+				&& dishes.existsByVenueIdAndNameIgnoreCaseAndArchivedFalseAndIdNot(dish.getVenueId(), dish.getName(), dishId)) {
+			throw new ConflictException("\"" + dish.getName() + "\" is already on this menu");
+		}
 		if (request.archived() != null) dish.setArchived(request.archived());
 		dish.makeOfficial();
 		return withPrices(List.of(dish)).get(0);
