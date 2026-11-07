@@ -52,6 +52,9 @@ const CUISINE_BY_CATEGORY = {
   peranakan_restaurant: 'peranakan',
 }
 
+// Every cuisine key the app knows.
+export const CUISINES = [...new Set(Object.values(CUISINE_BY_CATEGORY))]
+
 // Dish words the embedding model would not otherwise associate with a category.
 const CUISINE_GLOSS = {
   malaysian_restaurant: 'laksa, nasi lemak, mee rebus, mee siam',

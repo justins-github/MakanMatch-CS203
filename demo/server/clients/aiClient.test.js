@@ -53,11 +53,12 @@ test('refusal, thrown errors and bad JSON all give null', async () => {
   }
 })
 
-test('a blank or invalid timeout falls back to 6 s instead of giving up at once', async () => {
+test('a blank or invalid timeout falls back to 10 s instead of giving up at once', async () => {
   for (const timeoutMs of [0, NaN, -5]) {
     const fake = fakeAnthropic(() => new Promise((resolve) => setTimeout(() => resolve(answer('{"ok":true}')), 30)))
     const ai = createAiClient({ apiKey: 'test-key', timeoutMs, client: fake })
     assert.deepEqual(await ai.json(ASK), { ok: true }, `timeoutMs ${timeoutMs}`)
+    assert.equal(fake.calls[0].options.timeout, 10000)
   }
 })
 

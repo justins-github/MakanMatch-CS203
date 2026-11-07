@@ -2,10 +2,10 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { SMU, inSingapore, nearestArea, parseLatLon, venuesNear, walkMinutes } from './geo.js'
 
-test('walk minutes are straight-line metres at 80 a minute, at least 1', () => {
+test('walk minutes allow for streets not being straight, at 80 m a minute, at least 1', () => {
   assert.equal(walkMinutes(SMU, SMU), 1)
-  // 0.009 degrees of latitude is ~1 km -> 13 min.
-  assert.equal(walkMinutes(SMU, { lat: SMU.lat + 0.009, lon: SMU.lon }), 13)
+  // 0.009 degrees of latitude is ~1 km as the crow flies, ~1.4 km on foot -> 18 min.
+  assert.equal(walkMinutes(SMU, { lat: SMU.lat + 0.009, lon: SMU.lon }), 18)
 })
 
 test('a location header must be two numbers inside Singapore', () => {
@@ -26,11 +26,11 @@ test('a spot is named after the nearest two-hour forecast area', () => {
 test('venuesNear keeps venues within the walk, with their minutes from the spot', () => {
   const venues = [
     { id: 'near', lat: SMU.lat + 0.003, lon: SMU.lon },
-    { id: 'edge', lat: SMU.lat + 0.0144, lon: SMU.lon }, // ~1.6 km, exactly 20 min
-    { id: 'far', lat: SMU.lat + 0.02, lon: SMU.lon },
+    { id: 'edge', lat: SMU.lat + 0.0103, lon: SMU.lon }, // ~1.15 km straight, ~1.6 km on foot, 20 min
+    { id: 'far', lat: SMU.lat + 0.0144, lon: SMU.lon }, // ~1.6 km straight, so past 20 min on foot
     { id: 'unplaced' },
   ]
   const near = venuesNear(venues, SMU, 20)
-  assert.deepEqual(near.map((v) => [v.id, v.distanceMin]), [['near', 4], ['edge', 20]])
+  assert.deepEqual(near.map((v) => [v.id, v.distanceMin]), [['near', 6], ['edge', 20]])
   assert.equal(venues[0].distanceMin, undefined, 'the registry records are left alone')
 })

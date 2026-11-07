@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { addDish as addCatalogDish } from '../api/catalogApi.js'
 import { getProfile, getRankings, getVenueDishes, postBeliReview, searchVenues, undoReview } from '../api/engineApi.js'
+import { answerDuel, currentOpponent, startDuel } from '../duel.js'
 
 // Venue name with the server-computed match ranges bolded.
 function HighlightedName({ name, highlight }) {
@@ -57,22 +58,33 @@ const READ_BY = {
 }
 
 // What the AI learned from the review just posted, with Undo for when it got you
-// wrong (CSD-54): the profile goes back, the review and its score stay.
-function DeltaPanel({ result, onUndone }) {
+// wrong (CSD-54): the profile goes back, the review and its score stay. Redo undoes
+// it too, then lets you answer again; posting again moves the dish in your ranking.
+function DeltaPanel({ result, onUndone, onRedo }) {
   const { deltas, prediction } = result
   const [undo, setUndo] = useState({ busy: false, done: false, gone: false, error: null })
 
-  const undoIt = async () => {
+  // True once the review is undone.
+  const takeBack = async () => {
     setUndo({ busy: true, done: false, gone: false, error: null })
     try {
       await undoReview(result.review.dishId, result.review.at)
       setUndo({ busy: false, done: true, gone: false, error: null })
-      onUndone()
+      return true
     } catch (err) {
       // 409: a newer review (say, from another tab) or an earlier Undo got there first.
       const gone = err.status === 409
       setUndo({ busy: false, done: false, gone, error: gone ? "This review can't be undone any more." : `Undo failed: ${err.message}` })
+      return false
     }
+  }
+
+  const undoIt = async () => {
+    if (await takeBack()) onUndone()
+  }
+
+  const redoIt = async () => {
+    if (undo.done || (await takeBack())) onRedo()
   }
 
   return (
@@ -104,12 +116,19 @@ function DeltaPanel({ result, onUndone }) {
           Your Taste DNA is back to how it was before this review. Your {result.score10}/10 and ranking stay.
         </div>
       )}
-      {!undo.done && !undo.gone && deltas.length > 0 && (
+      {!undo.gone && (
         <div className="delta-undo">
-          <span>Not what you meant?</span>
-          <button onClick={undoIt} disabled={undo.busy}>
-            {undo.busy ? 'Undoing…' : 'Undo these changes'}
-          </button>
+          <span>{undo.done ? 'Want to answer differently?' : 'Not what you meant?'}</span>
+          <div className="delta-undo-actions">
+            {!undo.done && deltas.length > 0 && (
+              <button onClick={undoIt} disabled={undo.busy}>
+                {undo.busy ? 'Undoing…' : 'Undo these changes'}
+              </button>
+            )}
+            <button onClick={redoIt} disabled={undo.busy}>
+              Redo this review
+            </button>
+          </div>
         </div>
       )}
       {undo.error && <div className="error">{undo.error}</div>}
@@ -137,8 +156,9 @@ function Leaderboard({ rankings }) {
 
 const money = (v) => (v == null ? 'no price yet' : '$' + Number(v).toFixed(2))
 
+// active: whether this tab is showing; it stays mounted so an unfinished review survives.
 // startVenue: a venue picked on a For you card; the review starts at its dishes.
-export default function Review({ startVenue = null, onReviewSaved }) {
+export default function Review({ active = true, startVenue = null, onReviewSaved }) {
   const [loaded, setLoaded] = useState(false)
   const [venueDishes, setVenueDishes] = useState(null) // dishes at the chosen venue
   const [venueInfo, setVenueInfo] = useState(null) // { youManage, degraded }
@@ -146,18 +166,17 @@ export default function Review({ startVenue = null, onReviewSaved }) {
   const [accuracy, setAccuracy] = useState({ running: null, count: 0 })
   const [error, setError] = useState(null)
 
-  const [step, setStep] = useState(startVenue ? 'dish' : 'search')
+  const [step, setStep] = useState('search')
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [searching, setSearching] = useState(false)
   const abortRef = useRef(null)
   const cacheRef = useRef(new Map()) // query → results, per session
   const activeQueryRef = useRef('')
-  const [venue, setVenue] = useState(startVenue)
+  const [venue, setVenue] = useState(null)
   const [dish, setDish] = useState(null)
   const [sentiment, setSentiment] = useState(null)
-  const [duel, setDuel] = useState(null) // {opponents, lo, hi, count, pairs}
-  const [insertIndex, setInsertIndex] = useState(0)
+  const [duel, setDuel] = useState(null) // see duel.js; null with nothing to compare against
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState(null)
@@ -184,10 +203,20 @@ export default function Review({ startVenue = null, onReviewSaved }) {
       })
       .catch((err) => setError(err.message))
 
+  // Coming back to this tab refreshes the lists; a finished review isn't a draft to keep.
   useEffect(() => {
-    loadAll()
-    if (startVenue) loadVenue(startVenue)
-  }, [])
+    if (active) loadAll()
+    else if (step === 'done') startWizard()
+  }, [active])
+
+  // A For you card asking for its venue: a draft there carries on, anything else starts over.
+  useEffect(() => {
+    if (!startVenue || (venue?.id === startVenue.id && step !== 'done')) return
+    startWizard()
+    setVenue(startVenue)
+    setStep('dish')
+    loadVenue(startVenue)
+  }, [startVenue])
 
   // Debounced typeahead with a session cache; stale responses are aborted.
   useEffect(() => {
@@ -231,55 +260,59 @@ export default function Review({ startVenue = null, onReviewSaved }) {
     setDish(null)
     setSentiment(null)
     setDuel(null)
-    setInsertIndex(0)
     setText('')
     setResult(null)
     setAdding(false)
   }
 
+  // A different dish starts fresh; going back to the same one keeps your answer and words.
+  const pickDish = (d) => {
+    if (d.id !== dish?.id) {
+      setSentiment(null)
+      setText('')
+    }
+    setDish(d)
+    setStep('sentiment')
+  }
+
   const pickSentiment = (s) => {
     setSentiment(s)
     const opponents = rankings.filter((r) => r.dishId !== dish.id)
-    if (opponents.length === 0) {
-      setInsertIndex(0)
-      setStep('text')
-    } else {
-      setDuel({ opponents, lo: 0, hi: opponents.length, count: 0, pairs: [] })
+    setDuel(opponents.length > 0 ? startDuel(opponents) : null)
+    setStep(opponents.length > 0 ? 'duel' : 'text')
+  }
+
+  const answer = (a) => {
+    const next = answerDuel(duel, dish.id, a)
+    setDuel(next)
+    if (next.insertIndex !== null) setStep('text')
+  }
+
+  // One step back from the comparisons: the last answer, or else "How was it?".
+  const backFromDuel = () => (duel.previous ? setDuel(duel.previous) : setStep('sentiment'))
+
+  const backFromText = () => {
+    setError(null)
+    if (duel) {
+      setDuel(duel.previous)
       setStep('duel')
+    } else {
+      setStep('sentiment')
     }
   }
 
-  const answerDuel = (newDishWon, tie = false) => {
-    const { opponents, lo, hi, count, pairs } = duel
-    const mid = Math.floor((lo + hi) / 2)
-    const opponent = opponents[mid]
-    if (tie) {
-      setInsertIndex(mid)
-      setStep('text')
-      return
-    }
-    const nextPairs = [
-      ...pairs,
-      newDishWon
-        ? { winnerId: dish.id, loserId: opponent.dishId }
-        : { winnerId: opponent.dishId, loserId: dish.id },
-    ]
-    const nextLo = newDishWon ? lo : mid + 1
-    const nextHi = newDishWon ? mid : hi
-    if (nextLo >= nextHi || count + 1 >= 3) {
-      setDuel({ ...duel, pairs: nextPairs })
-      setInsertIndex(nextLo)
-      setStep('text')
-    } else {
-      setDuel({ opponents, lo: nextLo, hi: nextHi, count: count + 1, pairs: nextPairs })
-    }
+  // Back to "How was it?" for the dish just reviewed, with your words kept.
+  const redoReview = () => {
+    setResult(null)
+    setDuel(null)
+    setStep('sentiment')
   }
 
   const submit = async () => {
     setBusy(true)
     setError(null)
     try {
-      const r = await postBeliReview(dish.id, sentiment, insertIndex, duel?.pairs ?? [], text)
+      const r = await postBeliReview(dish.id, sentiment, duel?.insertIndex ?? 0, duel?.pairs ?? [], text)
       onReviewSaved?.()
       setResult(r)
       setAccuracy(r.accuracy)
@@ -299,11 +332,10 @@ export default function Review({ startVenue = null, onReviewSaved }) {
       const price = newDishPrice === '' ? null : Number(newDishPrice)
       const created = await addCatalogDish(venue.id, newDishName.trim(), price)
       await loadVenue(venue)
-      setDish({ id: created.id, name: created.name, venueId: venue.id, venueName: venue.name, predictedScore10: null })
+      pickDish({ id: created.id, name: created.name, venueId: venue.id, venueName: venue.name, predictedScore10: null })
       setAdding(false)
       setNewDishName('')
       setNewDishPrice('')
-      setStep('sentiment')
     } catch (err) {
       setError(err.message)
     } finally {
@@ -317,7 +349,7 @@ export default function Review({ startVenue = null, onReviewSaved }) {
   const searchActive = queryIsSearchable(query.trim())
   // Same-named chain outlets get their location appended.
   const nameCounts = results.reduce((m, r) => m.set(r.name, (m.get(r.name) ?? 0) + 1), new Map())
-  const currentOpponent = duel ? duel.opponents[Math.floor((duel.lo + duel.hi) / 2)] : null
+  const opponent = step === 'duel' ? currentOpponent(duel) : null
 
   return (
     <main className="rate">
@@ -405,10 +437,7 @@ export default function Review({ startVenue = null, onReviewSaved }) {
               <button
                 key={d.id}
                 className="venue-row"
-                onClick={() => {
-                  setDish(d)
-                  setStep('sentiment')
-                }}
+                onClick={() => pickDish(d)}
               >
                 <span className="venue-row-main">
                   <span className="venue-row-name">{d.name}</span>
@@ -467,7 +496,7 @@ export default function Review({ startVenue = null, onReviewSaved }) {
           <div className="rate-intro">How was it? You go first - the AI shows its prediction after you post.</div>
           <div className="sentiments">
             {SENTIMENTS.map((s) => (
-              <button key={s.id} className={`sentiment ${s.cls}`} onClick={() => pickSentiment(s.id)}>
+              <button key={s.id} className={`sentiment ${s.cls}`} aria-pressed={sentiment === s.id} onClick={() => pickSentiment(s.id)}>
                 {s.label}
               </button>
             ))}
@@ -475,26 +504,29 @@ export default function Review({ startVenue = null, onReviewSaved }) {
         </>
       )}
 
-      {step === 'duel' && currentOpponent && (
+      {step === 'duel' && opponent && (
         <>
+          <button className="back-link" onClick={backFromDuel}>
+            {duel.previous ? '← Undo last answer' : '← How was it?'}
+          </button>
           <h2 className="step-title">Which was better?</h2>
           <div className="rate-intro">
-            Quick comparison {duel.count + 1} - each answer trains your Taste DNA.
+            Quick comparison {duel.count + 1} - each answer trains your Taste DNA once you post.
           </div>
           <div className="duel">
-            <button className="duel-card" onClick={() => answerDuel(true)}>
+            <button className="duel-card" onClick={() => answer('won')}>
               <span className="duel-name">{dish.name}</span>
               <span className="duel-venue">{venue.name} · just now</span>
             </button>
             <span className="duel-vs">vs</span>
-            <button className="duel-card" onClick={() => answerDuel(false)}>
-              <span className="duel-name">{currentOpponent.name}</span>
+            <button className="duel-card" onClick={() => answer('lost')}>
+              <span className="duel-name">{opponent.name}</span>
               <span className="duel-venue">
-                {currentOpponent.venueName} · your #{currentOpponent.rank}
+                {opponent.venueName} · your #{opponent.rank}
               </span>
             </button>
           </div>
-          <button className="back-link" onClick={() => answerDuel(false, true)}>
+          <button className="back-link" onClick={() => answer('tie')}>
             Too close to call
           </button>
         </>
@@ -502,6 +534,9 @@ export default function Review({ startVenue = null, onReviewSaved }) {
 
       {step === 'text' && (
         <>
+          <button className="back-link" disabled={busy} onClick={backFromText}>
+            {duel ? '← Change last answer' : '← How was it?'}
+          </button>
           <h2 className="step-title">Say more about {dish.name}</h2>
           <div className="rate-intro">
             The AI reads this - themes repeated across your reviews compound in your Taste DNA.
@@ -529,7 +564,7 @@ export default function Review({ startVenue = null, onReviewSaved }) {
               #{result.rank.index + 1} of {result.rank.total} · {dish.name}
             </span>
           </div>
-          <DeltaPanel key={result.review.at} result={result} onUndone={loadAll} />
+          <DeltaPanel key={result.review.at} result={result} onUndone={loadAll} onRedo={redoReview} />
           <AccuracyMeter accuracy={accuracy} />
           <Leaderboard rankings={rankings} />
           <button className="teach-btn" onClick={startWizard}>

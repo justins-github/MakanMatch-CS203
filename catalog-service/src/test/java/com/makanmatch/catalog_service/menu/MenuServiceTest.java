@@ -28,6 +28,7 @@ import com.makanmatch.catalog_service.common.ConflictException;
 import com.makanmatch.catalog_service.common.ForbiddenException;
 import com.makanmatch.catalog_service.menu.dto.DishRequest;
 import com.makanmatch.catalog_service.menu.dto.DishResponse;
+import com.makanmatch.catalog_service.menu.dto.DishUpdateRequest;
 import com.makanmatch.catalog_service.menu.dto.MenuChangesRequest;
 import com.makanmatch.catalog_service.menu.dto.MenuChangesRequest.PriceChange;
 import com.makanmatch.catalog_service.menu.dto.PriceReportRequest;
@@ -199,6 +200,43 @@ class MenuServiceTest {
 				.isInstanceOf(BadRequestException.class)
 				.hasMessage("A dish to reprice isn't on this menu");
 		verify(prices, never()).save(any());
+	}
+
+	@Test
+	void aRemovedDishCanBePutBack() {
+		Dish wrap = new Dish("turks-kebab", "Chicken doner wrap", ReportSource.OWNER, null);
+		wrap.setArchived(true);
+		given(dishes.findById(wrap.getId())).willReturn(Optional.of(wrap));
+
+		service.update(wrap.getId(), new DishUpdateRequest(null, false), CALLER);
+
+		assertThat(wrap.isArchived()).isFalse();
+		assertThat(wrap.getArchivedAt()).isNull();
+	}
+
+	@Test
+	void aRemovedDishCannotComeBackOnceItsNameIsOnTheMenuAgain() {
+		Dish wrap = new Dish("turks-kebab", "Chicken doner wrap", ReportSource.OWNER, null);
+		wrap.setArchived(true);
+		given(dishes.findById(wrap.getId())).willReturn(Optional.of(wrap));
+		given(dishes.existsByVenueIdAndNameIgnoreCaseAndArchivedFalseAndIdNot("turks-kebab", "Chicken doner wrap", wrap.getId()))
+				.willReturn(true);
+
+		assertThatThrownBy(() -> service.update(wrap.getId(), new DishUpdateRequest(null, false), CALLER))
+				.isInstanceOf(ConflictException.class)
+				.hasMessage("\"Chicken doner wrap\" is already on this menu");
+		assertThat(wrap.isArchived()).isTrue();
+	}
+
+	@Test
+	void removingADishNeverTripsOverItsOwnName() {
+		Dish wrap = new Dish("turks-kebab", "Chicken doner wrap", ReportSource.OWNER, null);
+		given(dishes.findById(wrap.getId())).willReturn(Optional.of(wrap));
+
+		service.update(wrap.getId(), new DishUpdateRequest(null, true), CALLER);
+
+		assertThat(wrap.isArchived()).isTrue();
+		verify(dishes, never()).existsByVenueIdAndNameIgnoreCaseAndArchivedFalseAndIdNot(any(), any(), any());
 	}
 
 	@Test

@@ -48,8 +48,104 @@ test('a venue\'s dishes come with predictions and the catalog\'s price facts', a
   assert.equal(wrap.officialPrice, 9)
   assert.ok(wrap.predictedScore10 >= 0.5 && wrap.predictedScore10 <= 9.9)
   const laksa = dishes.find((d) => d.id === 'secret-laksa')
-  assert.equal(laksa.spice, 0.5, 'community dishes start with neutral features')
+  assert.equal(laksa.spice, null, 'community dishes have no taste features until someone curates them')
+  assert.equal(laksa.richness, null)
+  assert.equal(laksa.novelty, null)
+  assert.ok(laksa.predictedScore10 >= 0.5 && laksa.predictedScore10 <= 9.9, 'and still get a prediction')
   assert.equal(laksa.priceTier, 2)
+})
+
+test('loving a community dish, even over a spicy seed dish, leaves spice and richness alone', async () => {
+  const reviews = service()
+  const first = await reviews.submitBeli(diner, beli('chicken-doner-wrap'))
+  const second = await reviews.submitBeli(diner, beli('secret-laksa', {
+    duels: [{ winnerId: 'secret-laksa', loserId: 'chicken-doner-wrap' }],
+  }))
+  assert.equal(second.profile.spicePref, first.profile.spicePref)
+  assert.equal(second.profile.richnessPref, first.profile.richnessPref)
+  assert.equal(second.profile.adventurousness, first.profile.adventurousness)
+})
+
+// A review service whose estimator answers from `byDish`, recording what it was asked about.
+function withEstimates(byDish) {
+  const asked = []
+  const estimator = { estimate: async (dish) => { asked.push(dish.id); return byDish[dish.id] ?? null } }
+  const learners = memoryLearnerStore({ starter: starterProfile })
+  return { asked, reviews: createReviewService({ registry, learners, catalog: fakeCatalog(), seedDishes, vectors: { size: 0 }, estimator }) }
+}
+
+test('a duel credits the cuisine the dish is estimated to be, not the venue\'s', async () => {
+  const { reviews } = withEstimates({ 'secret-laksa': { spice: null, richness: null, cuisine: 'indian' } })
+  await reviews.submitBeli(diner, beli('shan-noodles', { sentiment: 'fine' }))
+  const { profile } = await reviews.submitBeli(diner, beli('secret-laksa', {
+    sentiment: 'fine', duels: [{ winnerId: 'secret-laksa', loserId: 'shan-noodles' }],
+  }))
+  assert.equal(profile.cuisineAffinity.indian, 0.53)
+  assert.equal(profile.cuisineAffinity.turkish, 0.5, 'the venue is Turkish, the dish is not')
+})
+
+test('a rating with no text still learns from the estimate', async () => {
+  const { reviews } = withEstimates({ 'secret-laksa': { spice: 0.9, richness: 0.5, cuisine: 'indian' } })
+  const { profile, deltas } = await reviews.submitBeli(diner, beli('secret-laksa'))
+  assert.equal(Math.round(profile.spicePref * 1000) / 1000, 0.6)
+  assert.equal(Math.round(profile.cuisineAffinity.indian * 1000) / 1000, 0.625)
+  assert.equal(profile.cuisineAffinity.turkish, 0.5)
+  assert.ok(deltas.find((d) => d.dimension === 'Spice').reason.includes('estimated from the dish name'))
+})
+
+test('a duel never compares spice or richness by estimate: the gap would be mostly the estimate\'s error', async () => {
+  const { reviews } = withEstimates({ 'secret-laksa': { spice: 0.9, richness: 0.1, cuisine: null } })
+  const first = await reviews.submitBeli(diner, beli('chicken-doner-wrap', { sentiment: 'fine' }))
+  const { profile } = await reviews.submitBeli(diner, beli('secret-laksa', {
+    sentiment: 'fine', duels: [{ winnerId: 'secret-laksa', loserId: 'chicken-doner-wrap' }],
+  }))
+  assert.equal(profile.spicePref, first.profile.spicePref)
+  assert.equal(profile.richnessPref, first.profile.richnessPref)
+})
+
+test('the same review with and without a duel moves spice the same when the dish is estimated', async () => {
+  const estimate = { 'secret-laksa': { spice: 0.9, richness: 0.1, cuisine: null } }
+  const alone = await withEstimates(estimate).reviews.submitBeli(diner, beli('secret-laksa'))
+  const { reviews } = withEstimates(estimate)
+  const first = await reviews.submitBeli(diner, beli('chicken-doner-wrap', { sentiment: 'fine' }))
+  const duelled = await reviews.submitBeli(diner, beli('secret-laksa', { duels: [{ winnerId: 'secret-laksa', loserId: 'chicken-doner-wrap' }] }))
+  const moved = (r, from) => Math.round((r.profile.spicePref - from) * 1e6) / 1e6
+  assert.equal(moved(duelled, first.profile.spicePref), Math.round((0.25 * (0.9 - first.profile.spicePref)) * 1e6) / 1e6)
+  assert.ok(moved(alone, 0.5) > 0)
+})
+
+test('duels between two curated dishes still compare their features', async () => {
+  const { reviews } = withEstimates({})
+  const first = await reviews.submitBeli(diner, beli('chicken-doner-wrap', { sentiment: 'fine' }))
+  const { profile } = await reviews.submitBeli(diner, beli('shan-noodles', {
+    sentiment: 'fine', duels: [{ winnerId: 'shan-noodles', loserId: 'chicken-doner-wrap' }],
+  }))
+  assert.equal(Math.round((profile.spicePref - first.profile.spicePref) * 1000) / 1000, 0.012, '0.12 x (0.4 - 0.3)')
+})
+
+test('a past dish in a duel is estimated too', async () => {
+  const { reviews, asked } = withEstimates({})
+  await reviews.submitBeli(diner, beli('secret-laksa'))
+  asked.length = 0
+  await reviews.submitBeli(diner, beli('shan-noodles', { duels: [{ winnerId: 'shan-noodles', loserId: 'secret-laksa' }] }))
+  assert.deepEqual(asked.sort(), ['secret-laksa', 'shan-noodles'])
+})
+
+test('a bad duel is rejected before Claude is asked anything', async () => {
+  const asks = []
+  const reader = { read: async () => { asks.push('read'); return { readBy: 'ai', blame: 'overall', signals: [] } } }
+  const estimator = { estimate: async () => { asks.push('estimate'); return null } }
+  const learners = memoryLearnerStore({ starter: starterProfile })
+  const reviews = createReviewService({ registry, learners, catalog: fakeCatalog(), seedDishes, vectors: { size: 0 }, reader, estimator })
+  await assert.rejects(reviews.submitBeli(diner, beli('shan-noodles', { text: 'nice', duels: [{ winnerId: 'ghost', loserId: 'shan-noodles' }] })), { status: 400 })
+  assert.deepEqual(asks, [])
+})
+
+test('an estimate that fails to arrive leaves the review working as before', async () => {
+  const { reviews } = withEstimates({})
+  const { profile, score10 } = await reviews.submitBeli(diner, beli('secret-laksa'))
+  assert.ok(score10 > 0)
+  assert.equal(profile.spicePref, 0.5)
 })
 
 test('when the catalog is down, seed dishes still show and the response says so', async () => {

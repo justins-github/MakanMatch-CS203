@@ -93,7 +93,7 @@ function Empty({ mode, group, walkMin }) {
   )
 }
 
-export default function Feed({ mode, data, onFind, onSurprise, onAnother, onBack, onReview }) {
+export default function Feed({ mode, data, onFind, onSurprise, onAnother, onPrevious, onBack, onReview }) {
   const [openId, setOpenId] = useState(null) // one card open at a time
   if (mode === 'idle') {
     return (
@@ -142,6 +142,11 @@ export default function Feed({ mode, data, onFind, onSurprise, onAnother, onBack
       {mode === 'surprise' && data.venues.length > 0 && (
         <button className="teach-btn" onClick={onAnother}>
           🎲 Another surprise
+        </button>
+      )}
+      {mode === 'surprise' && onPrevious && (
+        <button className="back-link" onClick={onPrevious}>
+          ← Previous pick
         </button>
       )}
     </main>

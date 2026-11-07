@@ -289,15 +289,15 @@ test('Find only keeps places within the walk of where you are, timed from there'
 
   const inBedok = await findFrom(recs, { from: BEDOK_MRT })
   assert.deepEqual(inBedok.venues.map((v) => v.id), ['jefri-botak'])
-  assert.equal(inBedok.venues[0].distanceMin, 1)
-  assert.ok(inBedok.venues[0].why.includes('1 min walk'))
+  assert.equal(inBedok.venues[0].distanceMin, 2)
+  assert.ok(inBedok.venues[0].why.includes('2 min walk'))
   assert.equal(inBedok.near.area, 'Bedok')
 })
 
 test('a shorter walk leaves out the places further away', async () => {
-  const result = await findFrom(service(), { walkMin: 6 })
+  const result = await findFrom(service(), { walkMin: 8 })
   assert.deepEqual(result.venues.map((v) => v.id), ['turks-kebab'])
-  assert.equal(result.near.walkMin, 6)
+  assert.equal(result.near.walkMin, 8)
 })
 
 test('a place with no coordinates is never counted as nearby', async () => {
@@ -310,7 +310,7 @@ test('search counts the walk from where you are, so its match % agrees with the 
   const [fromSmu] = await recs.search(diner, 'jefri', 5)
   const [fromBedok] = await recs.search(diner, 'jefri', 5, BEDOK_MRT)
   assert.ok(fromSmu.distanceMin > 100)
-  assert.equal(fromBedok.distanceMin, 1)
+  assert.equal(fromBedok.distanceMin, 2)
   assert.ok(fromBedok.matchScore > fromSmu.matchScore)
   const fed = await findFrom(recs, { from: BEDOK_MRT })
   assert.equal(fed.venues[0].matchScore, fromBedok.matchScore)

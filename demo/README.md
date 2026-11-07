@@ -34,7 +34,7 @@ a real sign-in screen. `npm test` runs the engine tests (`node --test`).
   Change picks where to search from: the browser's location, a OneMap place / MRT /
   postcode search (`GET /api/locations/search`), or a quick pick, plus a 10/20/30-min
   walk. It's kept in localStorage and sent to the engine as an `X-Location: lat,lon`
-  header (SMU when absent); walk times are straight-line at 80 m/min, worked out per
+  header (SMU when absent); walk times are estimated from the straight line x 1.4 (streets aren't straight) at 80 m/min, worked out per
   request (`server/geo.js`). **Find me a restaurant** returns the top-10
   matches within that walk, **Surprise me** returns one
   experimental pick from a cuisine your Taste DNA hasn't grown into yet (with an
@@ -67,8 +67,10 @@ a real sign-in screen. `npm test` runs the engine tests (`node --test`).
   leaderboard), and write a **text review**. The AI's predicted score stays hidden
   until you post, then it's shown next to yours so it can't anchor your rating. Three learning channels, all real and
   unit-tested (`server/learn.js`): the sentiment drives moving-average nudges
-  (α=0.25); every duel is a preference training pair (α=0.12 toward the winner's
-  features); and the text goes through **RAG-lite retrieval** over your own review
+  (α=0.25), using Claude's estimate of a dish's spice, richness and cuisine from its
+  name when nobody curated it (`server/dishEstimator.js`); every duel is a preference
+  training pair (α=0.12 toward the winner's features, comparing spice and richness only
+  between curated dishes); and the text goes through **RAG-lite retrieval** over your own review
   corpus (`server/reviewText.js`) - a transparent lexicon spots taste signals and
   scales the adjustment by how many past reviews carry the same signal, so writing
   "I love the spice" across many reviews compounds ("7 of your reviews mention

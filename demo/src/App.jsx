@@ -67,6 +67,8 @@ function SignedInApp() {
   const [tab, setTab] = useState('feed')
   const [petMinimized, setPetMinimized] = useState(false)
   const [reviewVenue, setReviewVenue] = useState(null) // set when a For you card starts a review
+  const [reviewOpened, setReviewOpened] = useState(false) // the Review tab loads when first opened
+  if (tab === 'rate' && !reviewOpened) setReviewOpened(true)
   const [mode, setMode] = useState('idle') // idle | find | surprise
   const [company, setCompany] = useState('solo') // solo | friends
   const [party, setParty] = useState([]) // ids of the kakis eating with you
@@ -158,8 +160,11 @@ function SignedInApp() {
 
   const anotherSurprise = () => {
     const current = recs?.venues?.[0]
-    if (current) setExclude((ids) => [...ids, current.id])
+    if (current) setExclude((ids) => (ids.includes(current.id) ? ids : [...ids, current.id]))
   }
+
+  // Un-skipping the last pick brings it back: with the same skips, the engine picks the same place.
+  const previousSurprise = () => setExclude((ids) => ids.slice(0, -1))
 
   const startPetReview = () => {
     setReviewVenue(null)
@@ -240,6 +245,7 @@ function SignedInApp() {
               onFind={() => startMode('find')}
               onSurprise={() => startMode('surprise')}
               onAnother={anotherSurprise}
+              onPrevious={exclude.length > 0 ? previousSurprise : null}
               onBack={backToLanding}
               onReview={(venue) => {
                 setReviewVenue(venue)
@@ -252,22 +258,26 @@ function SignedInApp() {
 
       {tab === 'kakis' && <Kakis key={viewKey} onEatTogether={eatTogether} onOpenMe={() => setTab('me')} />}
       {tab === 'rate' && (
-        <>
-          <MakanPet
-            pet={pet}
-            today={today}
-            simulator={simulator}
-            minimized={petMinimized}
-            onToggleMinimized={() => setPetMinimized((value) => !value)}
-            onNextDay={advanceDay}
-            onResetSimulator={resetDaySimulator}
-          />
+        <MakanPet
+          pet={pet}
+          today={today}
+          simulator={simulator}
+          minimized={petMinimized}
+          onToggleMinimized={() => setPetMinimized((value) => !value)}
+          onNextDay={advanceDay}
+          onResetSimulator={resetDaySimulator}
+        />
+      )}
+      {/* Stays mounted once opened, so an unfinished review survives a look at another tab. */}
+      {reviewOpened && (
+        <div className="tab-keep" hidden={tab !== 'rate'}>
           <Review
             key={viewKey}
+            active={tab === 'rate'}
             startVenue={reviewVenue}
             onReviewSaved={markReview}
           />
-        </>
+        </div>
       )}
       {tab === 'dna' && <TasteDna key={viewKey} />}
       {tab === 'me' && <Me key={viewKey} onResetTaste={resetTaste} />}

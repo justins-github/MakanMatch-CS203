@@ -5,7 +5,7 @@
 // reader (CSD-53) uses it today; explanations and summaries (CSD-49/52/56) later.
 import Anthropic from '@anthropic-ai/sdk'
 
-const DEFAULT_TIMEOUT_MS = 6000
+const DEFAULT_TIMEOUT_MS = 10000
 
 export function createAiClient({ apiKey, model = 'claude-haiku-5-5', timeoutMs: requestedMs, client } = {}) {
   // A blank or mistyped AI_TIMEOUT_MS would otherwise mean "give up at once".
