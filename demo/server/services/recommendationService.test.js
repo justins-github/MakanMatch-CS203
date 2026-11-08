@@ -19,7 +19,7 @@ const MONDAY_8PM = new Date('2026-09-28T20:00:00+08:00')
 
 const diner = { id: '88888888-8888-8888-8888-888888888888', me: { displayName: 'Mei', ownedVenues: [] } }
 
-function service({ hours = new Map(), hoursDown = false, venues = [TURKS, YANGON], kakis = [], changes, statuses = new Map(), prices = new Map(), explainer, clock = () => MONDAY_8PM, learners = memoryLearnerStore({ starter: starterProfile }) } = {}) {
+function service({ hours = new Map(), hoursDown = false, venues = [TURKS, YANGON], kakis = [], people, changes, statuses = new Map(), prices = new Map(), explainer, clock = () => MONDAY_8PM, learners = memoryLearnerStore({ starter: starterProfile }), vectors = { size: 0 } } = {}) {
   const catalog = {
     venueStatuses: async () => statuses,
     venuePrices: async () => prices,
@@ -35,10 +35,11 @@ function service({ hours = new Map(), hoursDown = false, venues = [TURKS, YANGON
       if (!ids.every((id) => kakis.some((k) => k.id === id))) throw Object.assign(new Error('not kakis'), { status: 400 })
       return kakis.filter((k) => ids.includes(k.id))
     },
+    ...(people ? { people } : {}),
   }
   return createRecommendationService({
     registry: registryOf(venues),
-    vectors: { size: 0 },
+    vectors,
     learners,
     catalog,
     accounts,
@@ -123,6 +124,42 @@ test('a group Surprise gives one pick that passes the floor', async () => {
 
 // --- CSD-50: "Since your last visit" on cards for places you've reviewed ---
 
+// Taste set by hand (profileService.tune): the embedding comes from the cuisines on the
+// sliders, not from your reviews, until your next review.
+test('a taste set by hand takes its embedding from the sliders, not your reviews', async () => {
+  const learners = memoryLearnerStore({ starter: starterProfile })
+  await learners.update(diner.id, 'Mei', async (state) => {
+    state.reviews.push({ dishId: 'mohinga', dishName: 'Mohinga', venueId: 'yangon-flavours', score10: 9, at: '2026-10-12T04:00:00.000Z' })
+    return { result: null }
+  })
+  // Mei's review taught a taste right on Yangon. The ramen bar has no cuisine on record,
+  // but its embedding sits next to the Japanese place's.
+  const SUSHI = { id: 'sushi-bar', name: 'Sushi Bar', cuisine: 'japanese', lat: 1.3010, lon: 103.85, gersId: 'g-sushi' }
+  const RAMEN = { id: 'ramen-bar', name: 'Ramen Bar', cuisine: null, lat: 1.3012, lon: 103.85, gersId: 'g-ramen' }
+  const embeddings = new Map([['g-sushi', [1, 0, 0]], ['g-ramen', [0.96, 0.28, 0]], ['g-yangon', [0, 0, 1]], ['g-turks', [0, 1, 0]]])
+  const cosine = (a, b) => a.reduce((sum, x, i) => sum + x * b[i], 0) / (Math.hypot(...a) * Math.hypot(...b))
+  const vectors = {
+    size: embeddings.size,
+    vectorsFor: async (ids) => new Map(ids.filter((id) => embeddings.has(id)).map((id) => [id, embeddings.get(id)])),
+    similarities: async (ids, vector) => new Map(ids.filter((id) => embeddings.has(id)).map((id) => [id, cosine(embeddings.get(id), [...vector])])),
+  }
+  const venues = [{ ...TURKS, gersId: 'g-turks' }, { ...YANGON, gersId: 'g-yangon' }, SUSHI, RAMEN]
+  const recs = service({ venues, vectors, learners, changes: async () => null })
+  const byId = async () => new Map((await find(recs)).venues.map((v) => [v.id, v]))
+
+  const learned = await byId()
+  assert.ok(learned.get('yangon-flavours').why.includes("Similar to places you've rated well"))
+  assert.ok(!learned.get('ramen-bar').why.some((w) => w.startsWith('Close to')))
+
+  await learners.update(diner.id, 'Mei', async (state) => {
+    state.profile = { ...state.profile, cuisineAffinity: { japanese: 1, burmese: 0.3 }, setByHand: true }
+    return { result: null }
+  })
+  const byHand = await byId()
+  assert.ok(byHand.get('ramen-bar').why.includes('Close to the taste you set'))
+  assert.ok(!byHand.get('yangon-flavours').why.some((w) => w.startsWith('Similar') || w.startsWith('Close')))
+})
+
 const VISIT = '2026-10-12T04:00:00.000Z'
 const WRAP_UP = { since: VISIT, prices: [{ dishId: 'wrap', name: 'Chicken doner wrap', from: 8.5, to: 10.5, at: '2026-10-20T04:00:00Z' }], added: [], removed: [], updates: [] }
 
@@ -188,6 +225,15 @@ test('the card says what the venue\'s changes did to your match, with your taste
   const turks = (await find(recs)).venues.find((v) => v.id === 'turks-kebab')
   assert.equal(turks.sinceLastVisit.match.now, turks.matchScore)
   assert.ok(turks.sinceLastVisit.match.was > turks.sinceLastVisit.match.now, 'pricier than at the visit: the match went down')
+})
+
+// The catalog prices every place with a menu, so a card can say it has one (an admin can
+// review-bomb only those: the bombers need a dish to pan).
+test('cards for places with a menu say so', async () => {
+  const recs = service({ prices: new Map([['turks-kebab', 9]]) })
+  const byId = new Map((await find(recs)).venues.map((v) => [v.id, v]))
+  assert.equal(byId.get('turks-kebab').hasMenu, true)
+  assert.equal(byId.get('yangon-flavours').hasMenu, undefined)
 })
 
 test('no match line when the venue\'s changes didn\'t move it, and none on group cards', async () => {
@@ -314,4 +360,261 @@ test('search counts the walk from where you are, so its match % agrees with the 
   assert.ok(fromBedok.matchScore > fromSmu.matchScore)
   const fed = await findFrom(recs, { from: BEDOK_MRT })
   assert.equal(fed.venues[0].matchScore, fromBedok.matchScore)
+})
+
+// Other people's reviews change your match. Turk's Kebab with its curated spice, at a 5 minute walk.
+const MILD_TURKS = { ...TURKS, spice: 0.3, richness: 0.7, priceTier: 1 }
+const WEI_LING = '11111111-1111-1111-1111-111111111111'
+const HAFIZ = '22222222-2222-2222-2222-222222222222'
+const NADIA = '33333333-3333-3333-3333-333333333333'
+const NAMES = { [WEI_LING]: 'Wei Ling', [HAFIZ]: 'Hafiz', [NADIA]: 'Nadia' }
+const names = async (_token, ids) => ids.map((id) => ({ id, displayName: NAMES[id], username: null }))
+const TOO_SPICY = { dimension: 'spice', direction: 'down', strength: 2, quote: 'SUPER SPICY', why: '' }
+
+const daysBefore = (days) => new Date(MONDAY_8PM.getTime() - days * 24 * 60 * 60 * 1000).toISOString()
+const longAgo = { dishId: 'old', dishName: 'Old', venueId: 'somewhere-else', sentiment: 'fine', text: '', at: daysBefore(90) }
+
+// Someone with this taste and this many reviews, all long enough ago not to count.
+const person = (learners, userId, taste, reviewCount = 8) =>
+  learners.update(userId, 'Someone', async (state) => {
+    Object.assign(state.profile, taste)
+    state.reviews.push(...Array.from({ length: reviewCount }, () => ({ ...longAgo })))
+    return { result: null }
+  })
+
+const says = (learners, userId, extra = {}) =>
+  learners.update(userId, 'Someone', async (state) => {
+    state.reviews.push({
+      dishId: 'wrap', dishName: 'Wrap', venueId: TURKS.id, sentiment: 'disliked', text: 'SUPER SPICY', signals: [TOO_SPICY], at: daysBefore(1), ...extra,
+    })
+    return { result: null }
+  })
+
+const newLearners = () => memoryLearnerStore({ starter: starterProfile })
+
+// A spice-shy diner, plus `count` people like them who've each reviewed the place.
+async function bombed(learners, count = 3, { dinerTaste = { spicePref: 0.15 }, extra = {} } = {}) {
+  await person(learners, diner.id, dinerTaste)
+  for (const id of [WEI_LING, HAFIZ, NADIA].slice(0, count)) {
+    await person(learners, id, { spicePref: 0.18 })
+    await says(learners, id, extra)
+  }
+}
+
+const cardOf = (result) => result.venues.find((v) => v.id === TURKS.id)
+const quietScore = async (dinerTaste = { spicePref: 0.15 }) => {
+  const learners = newLearners()
+  await person(learners, diner.id, dinerTaste)
+  return cardOf(await find(service({ learners, venues: [MILD_TURKS] }))).matchScore
+}
+
+test('three "too spicy" reviews lower a spice-shy diner by 10 or more, and the card says why', async () => {
+  const learners = newLearners()
+  await bombed(learners)
+  const card = cardOf(await find(service({ learners, venues: [MILD_TURKS], people: names })))
+  assert.ok(card.reviewChange.was - card.reviewChange.now >= 10, `${card.reviewChange.was} -> ${card.reviewChange.now}`)
+  assert.equal(card.reviewChange.now, card.matchScore)
+  assert.equal(card.reviewChange.text, "3 people with taste like yours said it's too spicy.")
+  assert.equal(card.reviewChange.label, 'Recent reviews · this week')
+  assert.deepEqual(card.reviewChange.reviewers.map((r) => r.displayName).sort(), ['Hafiz', 'Nadia', 'Wei Ling'])
+  assert.deepEqual(Object.keys(card.reviewChange.reviewers[0]).sort(), ['displayName', 'id'])
+})
+
+test('"was" is what the card scores with no reviews at all', async () => {
+  const before = await quietScore()
+  const learners = newLearners()
+  await bombed(learners)
+  const card = cardOf(await find(service({ learners, venues: [MILD_TURKS], people: names })))
+  assert.equal(card.reviewChange.was, before)
+})
+
+test('one review moves a spice-shy diner by under 5 points', async () => {
+  const before = await quietScore()
+  const learners = newLearners()
+  await bombed(learners, 1)
+  const after = cardOf(await find(service({ learners, venues: [MILD_TURKS], people: names }))).matchScore
+  assert.ok(before > after && before - after < 5, `${before} -> ${after}`)
+})
+
+test('three brand-new accounts move the match by 2 points or fewer', async () => {
+  const before = await quietScore()
+  const learners = newLearners()
+  await person(learners, diner.id, { spicePref: 0.15 })
+  for (const id of [WEI_LING, HAFIZ, NADIA]) await says(learners, id)
+  const after = cardOf(await find(service({ learners, venues: [MILD_TURKS], people: names }))).matchScore
+  assert.ok(before - after <= 2, `${before} -> ${after}`)
+})
+
+test('the same reviews raise the match for a spice lover', async () => {
+  const learners = newLearners()
+  await bombed(learners, 3, { dinerTaste: { spicePref: 1 } })
+  const card = cardOf(await find(service({ learners, venues: [MILD_TURKS], people: names })))
+  assert.ok(card.reviewChange.now > card.reviewChange.was, `${card.reviewChange.was} -> ${card.reviewChange.now}`)
+  assert.equal(card.reviewChange.text, "3 people said it's too spicy, which usually suits you.")
+})
+
+test('undone reviews stop counting, and the match goes back', async () => {
+  const learners = newLearners()
+  await bombed(learners)
+  const before = cardOf(await find(service({ learners, venues: [MILD_TURKS], people: names })))
+  for (const id of [WEI_LING, HAFIZ, NADIA]) {
+    await learners.update(id, 'Someone', async (state) => {
+      state.reviews.at(-1).undone = true
+      return { result: null }
+    })
+  }
+  const after = cardOf(await find(service({ learners, venues: [MILD_TURKS], people: names })))
+  assert.equal(after.matchScore, before.reviewChange.was)
+  assert.equal(after.reviewChange, undefined)
+})
+
+test('reviews more than 30 days old have no effect', async () => {
+  const learners = newLearners()
+  await bombed(learners, 3, { extra: { at: daysBefore(31) } })
+  const card = cardOf(await find(service({ learners, venues: [MILD_TURKS], people: names })))
+  assert.equal(card.reviewChange, undefined)
+})
+
+test('with no reviews, nothing changes and nothing dropped out', async () => {
+  const result = await find(service({ learners: newLearners(), venues: [MILD_TURKS] }))
+  assert.equal(cardOf(result).reviewChange, undefined)
+  assert.deepEqual(result.droppedByReviews, [])
+})
+
+test('your own review does not move your own match', async () => {
+  const learners = newLearners()
+  await person(learners, diner.id, { spicePref: 0.15 })
+  await says(learners, diner.id)
+  const changes = async () => ({ prices: [], added: [], removed: [], updates: [], since: daysBefore(1), priceThen: null, priceNow: null })
+  const card = cardOf(await find(service({ learners, venues: [MILD_TURKS], changes })))
+  assert.equal(card.reviewChange, undefined)
+})
+
+test('group scores count reviews, per person, with no banner', async () => {
+  const KAKI = '44444444-4444-4444-4444-444444444444'
+  const kakis = [{ id: KAKI, displayName: 'Jia Hui', restrictions: [] }]
+  const withKaki = (recs) => recs.recommend(diner, { mode: 'find', mood: null, context: { raining: false }, withIds: [KAKI] })
+  const quiet = newLearners()
+  await person(quiet, diner.id, { spicePref: 0.15 })
+  const before = cardOf(await withKaki(service({ learners: quiet, venues: [MILD_TURKS], kakis })))
+  const learners = newLearners()
+  await bombed(learners)
+  const result = await withKaki(service({ learners, venues: [MILD_TURKS], kakis, people: names }))
+  const after = cardOf(result)
+  assert.ok(after.groupScores[0].score < before.groupScores[0].score)
+  assert.equal(after.reviewChange, undefined)
+  assert.equal(result.droppedByReviews, undefined)
+})
+
+test('a Surprise pick says when reviews moved it, and has no dropped-out list', async () => {
+  const learners = newLearners()
+  await bombed(learners)
+  const recs = service({ learners, venues: [MILD_TURKS], people: names })
+  const result = await recs.recommend(diner, { mode: 'surprise', mood: null, context: { raining: false } })
+  const [pick] = result.venues
+  assert.ok(pick.reviewChange.was - pick.reviewChange.now >= 10)
+  assert.equal(pick.reviewChange.now, pick.matchScore)
+  assert.equal(result.droppedByReviews, undefined)
+})
+
+test('search shows the same match as the card', async () => {
+  const learners = newLearners()
+  await bombed(learners)
+  const recs = service({ learners, venues: [MILD_TURKS], people: names })
+  const card = cardOf(await find(recs))
+  const [found] = await recs.search(diner, 'turk', 5)
+  assert.equal(found.matchScore, card.matchScore)
+  assert.equal(found.matchScore, card.reviewChange.now)
+})
+
+test("if reviews can't be read, Find still answers with today's scores", async () => {
+  const before = await quietScore()
+  const quiet = newLearners()
+  await person(quiet, diner.id, { spicePref: 0.15 })
+  const learners = { ...quiet, recentReviewsAt: async () => { throw new Error('database down') } }
+  const after = cardOf(await find(service({ learners, venues: [MILD_TURKS] })))
+  assert.equal(after.matchScore, before)
+})
+
+test("if names can't be fetched, the banner still shows, without faces", async () => {
+  const learners = newLearners()
+  await bombed(learners)
+  const down = async () => { throw new Error('account service down') }
+  const card = cardOf(await find(service({ learners, venues: [MILD_TURKS], people: down })))
+  assert.ok(card.reviewChange.text.startsWith('3 people'))
+  assert.deepEqual(card.reviewChange.reviewers, [])
+})
+
+test('with no way to fetch names at all, Find still works', async () => {
+  const learners = newLearners()
+  await bombed(learners)
+  const card = cardOf(await find(service({ learners, venues: [MILD_TURKS] })))
+  assert.deepEqual(card.reviewChange.reviewers, [])
+})
+
+// Places scoring between Turk's Kebab before the reviews (79) and after them (about 64).
+const rivals = (count, facts = { spice: 0.6 }) => Array.from({ length: count }, (_, i) => ({
+  id: `rival-${i}`, name: `Rival ${i}`, cuisine: 'thai', richness: 0.5, priceTier: 1, lat: TURKS.lat, lon: TURKS.lon, ...facts,
+}))
+
+test('a place pushed out of the top 10 by reviews stays on screen below the list', async () => {
+  const learners = newLearners()
+  await bombed(learners)
+  const result = await find(service({ learners, venues: [MILD_TURKS, ...rivals(10)], people: names }))
+  assert.equal(result.venues.length, 10)
+  assert.ok(!result.venues.some((v) => v.id === TURKS.id))
+  assert.deepEqual(result.droppedByReviews.map((v) => v.id), [TURKS.id])
+  const [dropped] = result.droppedByReviews
+  assert.ok(dropped.reviewChange.now < dropped.reviewChange.was)
+  assert.equal(dropped.matchScore, dropped.reviewChange.now)
+  assert.ok(dropped.reviewChange.text.includes('too spicy'))
+})
+
+test('a place that stays in the top 10 is not listed as dropped', async () => {
+  const learners = newLearners()
+  await bombed(learners)
+  const result = await find(service({ learners, venues: [MILD_TURKS, ...rivals(5)], people: names }))
+  assert.ok(result.venues.some((v) => v.id === TURKS.id))
+  assert.deepEqual(result.droppedByReviews, [])
+})
+
+test('a place that was never in your top 10 is not listed as dropped', async () => {
+  const learners = newLearners()
+  await bombed(learners)
+  const neverTop = { ...MILD_TURKS, spice: 1 } // below the rivals with or without reviews
+  const result = await find(service({ learners, venues: [neverTop, ...rivals(10)], people: names }))
+  assert.ok(!result.venues.some((v) => v.id === TURKS.id))
+  assert.deepEqual(result.droppedByReviews, [])
+})
+
+test('a place left out for being shut is not listed as dropped', async () => {
+  const learners = newLearners()
+  await bombed(learners)
+  const hours = new Map([[TURKS.id, everyDay('11:00', '14:30')]])
+  const result = await find(service({ learners, venues: [MILD_TURKS, ...rivals(10)], people: names, hours }))
+  assert.deepEqual(result.droppedByReviews, [])
+})
+
+test('a place that only slipped out by under 3 points is not listed', async () => {
+  const learners = newLearners()
+  await person(learners, diner.id, { spicePref: 0.15 })
+  await person(learners, WEI_LING, { spicePref: 0.18 }, 2) // with this review that's 3: it counts, but not in full
+  await says(learners, WEI_LING)
+  const result = await find(service({ learners, venues: [MILD_TURKS, ...rivals(10, { spice: 0.45 })], people: names }))
+  assert.ok(!result.venues.some((v) => v.id === TURKS.id), 'it did slip out')
+  assert.deepEqual(result.droppedByReviews, [])
+})
+
+test('at most three places are listed as dropped, biggest drop first', async () => {
+  const learners = newLearners()
+  await person(learners, diner.id, { spicePref: 0.15 })
+  const places = ['one-review', 'three-reviews', 'two-reviews', 'also-one'].map((id) => ({ ...MILD_TURKS, id, name: id }))
+  const reviewers = { 'one-review': [WEI_LING], 'three-reviews': [WEI_LING, HAFIZ, NADIA], 'two-reviews': [WEI_LING, HAFIZ], 'also-one': [HAFIZ] }
+  for (const id of [WEI_LING, HAFIZ, NADIA]) await person(learners, id, { spicePref: 0.18 })
+  for (const [venueId, ids] of Object.entries(reviewers)) {
+    for (const id of ids) await says(learners, id, { venueId })
+  }
+  const result = await find(service({ learners, venues: [...places, ...rivals(10)], people: names }))
+  assert.equal(result.droppedByReviews.length, 3)
+  assert.deepEqual(result.droppedByReviews.slice(0, 2).map((v) => v.id), ['three-reviews', 'two-reviews'])
 })

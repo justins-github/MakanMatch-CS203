@@ -1,0 +1,245 @@
+/* Other people's reviews: on a venue's card, on a reviewer's profile, and in recent eats. */
+
+.rv-section {
+  margin: 12px 0;
+}
+
+.rv-title {
+  margin-bottom: 6px;
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.rv-note {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.rv-row {
+  display: flex;
+  gap: 9px;
+  padding: 10px 0;
+  border-top: 1.5px dashed #cfc8ba;
+}
+
+.rv-row:first-of-type {
+  border-top: 0;
+}
+
+.rv-row.faded {
+  opacity: 0.62;
+}
+
+.rv-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.rv-face,
+.rv-who {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.rv-who {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.rv-who:not(.plain):hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.rv-who.plain {
+  cursor: default;
+}
+
+.rv-handle {
+  font-family: var(--font-data);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
+.rv-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 3px;
+}
+
+.rv-pill {
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  padding: 0 6px;
+  background: var(--paper);
+}
+
+.rv-pill.close {
+  background: var(--pandan-wash);
+  border-color: var(--pandan);
+  color: var(--pandan);
+  font-weight: 500;
+}
+
+.rv-pill.far {
+  background: var(--paper-dim);
+  border-color: var(--ink-soft);
+  color: var(--ink-soft);
+}
+
+.rv-pill.kaki {
+  background: var(--kunyit);
+  font-weight: 500;
+}
+
+.rv-counts {
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  color: var(--ink-soft);
+}
+
+.rv-verdict {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.rv-verdict.loved { color: var(--pandan); }
+.rv-verdict.fine { color: var(--ink-soft); }
+.rv-verdict.disliked { color: var(--chili); }
+
+.rv-said {
+  margin-top: 4px;
+  font-size: 13px;
+}
+
+.rv-meta {
+  margin-top: 3px;
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  color: var(--ink-soft);
+}
+
+/* The banner on a card */
+.rv-faces {
+  display: flex;
+  margin-top: 6px;
+}
+
+.rv-faces .rv-face {
+  margin-right: -6px;
+}
+
+/* Below the top 10 */
+.rv-dropped-title {
+  margin: 22px 0 8px;
+  font-family: var(--font-data);
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+/* A reviewer's profile */
+.rv-profile-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  padding-right: 72px;
+}
+
+.rv-profile-who {
+  min-width: 0;
+}
+
+.rv-sticker {
+  top: -4px;
+  right: 2px;
+}
+
+.rv-sticker .label {
+  text-align: center;
+}
+
+.rv-actions {
+  margin: 12px 0;
+}
+
+.rv-chart {
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.rv-chart svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.rv-legend {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  font-family: var(--font-data);
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.rv-legend i {
+  display: inline-block;
+  width: 14px;
+  height: 0;
+  margin-right: 4px;
+  vertical-align: middle;
+  border-top: 2.5px solid var(--chili);
+}
+
+.rv-legend i.you {
+  border-top: 2.5px dashed var(--monsoon);
+}
+
+.rv-agrees {
+  margin-top: 8px;
+  font-size: 13.5px;
+}
+
+/* Recent eats on the Kakis page */
+.rv-panel {
+  border: var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  padding: 2px 12px;
+}
+
+.rv-tap {
+  appearance: none;
+  width: 100%;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rv-tap:first-child {
+  border-top: 0;
+}

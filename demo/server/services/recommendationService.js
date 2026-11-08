@@ -1,16 +1,22 @@
 // "For you" recommendations - for one person or a table of kakis - and
 // personalised venue search.
 import { createChangeExplainer, factsFor, templateExplanation } from '../changeExplainer.js'
+import { BANNER_MIN_POINTS, WINDOW_DAYS, communityFor, reviewChange } from '../community.js'
 import { applyDietary, vegetarianBoost } from '../dietary.js'
 import { DEFAULT_WALK_MIN, SMU, nearestArea, venuesNear, walkMinutes } from '../geo.js'
 import { AIMED_FLOOR, groupFind, groupSurprise } from '../groupMatch.js'
 import { applyOpeningHours } from '../hours.js'
 import { pickSurprise, priceLevel, rankVenues } from '../match.js'
 import { searchVenues } from '../search.js'
-import { learnedVector, tasteContext } from './tasteVectors.js'
+import { createSliderVectors, learnedVector, tasteContext } from './tasteVectors.js'
 
 const round1 = (v) => Math.round(v * 10) / 10
 const CLOSED = new Set(['CLOSED', 'TEMPORARILY_CLOSED'])
+const DAY_MS = 24 * 60 * 60 * 1000
+const TOP = 10 // how many places Find shows
+const MAX_DROPPED = 3
+const byMatch = (a, b) => b.matchScore - a.matchScore
+const standingBy = (reviews) => reviews.filter((r) => !r.undone).length
 
 export function createRecommendationService({
   registry, vectors, learners, catalog, accounts, explainer = createChangeExplainer({ ai: null }), now = () => new Date(),
@@ -33,16 +39,38 @@ export function createRecommendationService({
     }
   }
 
-  // What match.js needs to rank `venues` for one person: their Taste DNA and taste vector.
-  async function contextFor(person, venues, { raining, mood }) {
+  // Other people's recent reviews at these venues (null = everywhere) and who wrote them.
+  // If they can't be read we still recommend, as if nobody had said anything.
+  async function crowdAt(venueIds) {
+    try {
+      const rows = await learners.recentReviewsAt(venueIds, new Date(now().getTime() - WINDOW_DAYS * DAY_MS).toISOString())
+      return { rows, people: await learners.peopleFacts([...new Set(rows.map((r) => r.userId))]) }
+    } catch {
+      return { rows: [], people: new Map() }
+    }
+  }
+
+  const viewerFrom = (person, state) => ({ id: person.id, profile: state.profile, reviewCount: standingBy(state.reviews) })
+  const reviewsFor = (viewer, crowd) => communityFor(viewer, crowd.rows, crowd.people, now().getTime())
+
+  // What match.js needs to rank `venues` for one person: their Taste DNA, taste vector
+  // and what other people's reviews do for them. A taste set by hand (the Taste DNA
+  // sliders) takes its vector from the sliders' cuisines, not from their reviews.
+  const sliderVector = createSliderVectors(vectors, registry.venues ?? [])
+  async function contextFor(person, venues, { raining, mood }, crowd) {
     const state = await learners.read(person.id, person.name)
-    const vector = await learnedVector(vectors, state.reviews, registry.venueById)
-    const taste = await tasteContext(vectors, vector, venues)
-    const ctx = { raining, mood, taste }
-    return { state, ctx }
+    const byHand = Boolean(state.profile.setByHand)
+    const vector = byHand
+      ? await sliderVector(state.profile)
+      : await learnedVector(vectors, state.reviews, registry.venueById)
+    const taste = await tasteContext(vectors, vector, venues, byHand ? 'Close to the taste you set' : undefined)
+    const viewer = viewerFrom(person, state)
+    const ctx = { raining, mood, taste, community: reviewsFor(viewer, crowd) }
+    return { state, ctx, viewer }
   }
 
   // CSD-51: live menu prices set a venue's price level; without them it keeps the registry's.
+  // A venue the catalog prices has a menu (hasMenu), which an admin's review bomb needs.
   async function livePrices() {
     try {
       return await catalog.venuePrices()
@@ -51,7 +79,7 @@ export function createRecommendationService({
     }
   }
   const withLivePrices = (venues, prices) =>
-    venues.map((v) => (prices.has(v.id) ? { ...v, priceTier: priceLevel(prices.get(v.id)) } : v))
+    venues.map((v) => (prices.has(v.id) ? { ...v, priceTier: priceLevel(prices.get(v.id)), hasMenu: true } : v))
 
   // CSD-51: the venue as it was at your visit (its price level then), scored with your
   // taste today, next to the card's match now; null when the venue's changes didn't move
@@ -101,12 +129,51 @@ export function createRecommendationService({
   }
 
   // Their scores for every venue, vegetarian places nudged up for vegetarians.
-  async function rankedFor(person, venues, context) {
-    const { state, ctx } = await contextFor(person, venues, context)
-    const score = (v) => vegetarianBoost(v, rankVenues([v], state.profile, ctx)[0].matchScore, person.restrictions)
-    const ranked = rankVenues(venues, state.profile, ctx)
+  async function rankedFor(person, venues, context, crowd) {
+    const { state, ctx, viewer } = await contextFor(person, venues, context, crowd)
+    const noReviews = { ...ctx, community: null }
+    const scoreWith = (c) => (v) => vegetarianBoost(v, rankVenues([v], state.profile, c)[0].matchScore, person.restrictions)
+    const rankWith = (c) => rankVenues(venues, state.profile, c)
       .map((v) => ({ ...v, matchScore: vegetarianBoost(v, v.matchScore, person.restrictions) }))
-    return { ...person, adventurousness: state.profile.adventurousness, profile: state.profile, ranked, score }
+    return {
+      ...person,
+      adventurousness: state.profile.adventurousness,
+      profile: state.profile,
+      ranked: rankWith(ctx),
+      score: scoreWith(ctx),
+      scoreWithoutReviews: scoreWith(noReviews),
+      rankedWithoutReviews: () => rankWith(noReviews),
+      community: ctx.community,
+      viewer,
+    }
+  }
+
+  // Who wrote what, for showing faces: if account-service can't say, the card goes without.
+  async function namesOf(user, ids) {
+    try {
+      return new Map((await accounts.people(user.token, ids)).map((p) => [p.id, p]))
+    } catch {
+      return new Map()
+    }
+  }
+
+  // Cards whose match moved because of reviews say so. `you` = { community, viewer, scoreWithoutReviews }.
+  async function withReviewChange(cards, you, user) {
+    const changes = new Map()
+    for (const card of cards) {
+      const input = you.community.get(card.id)
+      const change = input && reviewChange(input, you.scoreWithoutReviews(card), card.matchScore, you.viewer, now().getTime())
+      if (change) changes.set(card.id, change)
+    }
+    if (changes.size === 0) return cards
+    const people = await namesOf(user, [...new Set([...changes.values()].flatMap((c) => c.reviewerIds))])
+    return cards.map((card) => {
+      const change = changes.get(card.id)
+      if (!change) return card
+      const { reviewerIds, ...said } = change
+      const reviewers = reviewerIds.filter((id) => people.has(id)).map((id) => ({ id, displayName: people.get(id).displayName }))
+      return { ...card, reviewChange: { ...said, reviewers } }
+    })
   }
 
   return {
@@ -136,20 +203,27 @@ export function createRecommendationService({
         dietary: { dropped },
       }
       const scene = { raining: context.raining, mood }
+      const crowd = await crowdAt(allowed.map((v) => v.id))
 
       if (kakis.length === 0) {
         if (mode === 'surprise') {
-          const { state, ctx } = await contextFor(me, allowed, scene)
+          const { state, ctx, viewer } = await contextFor(me, allowed, scene, crowd)
           const pick = [pickSurprise(allowed, state.profile, ctx, exclude)].filter(Boolean)
           const score = (v) => rankVenues([v], state.profile, ctx)[0].matchScore
-          return { ...answer, venues: await withSinceLastVisit(pick, visits, { score, profile: state.profile }) }
+          const scoreWithoutReviews = (v) => rankVenues([v], state.profile, { ...ctx, community: null })[0].matchScore
+          const cards = await withSinceLastVisit(pick, visits, { score, profile: state.profile })
+          return { ...answer, venues: await withReviewChange(cards, { community: ctx.community, viewer, scoreWithoutReviews }, user) }
         }
-        const { ranked, score, profile } = await rankedFor(me, allowed, scene)
-        const top = ranked.sort((a, b) => b.matchScore - a.matchScore).slice(0, 10)
-        return { ...answer, venues: await withSinceLastVisit(top, visits, { score, profile }) }
+        const you = await rankedFor(me, allowed, scene, crowd)
+        const ranked = you.ranked.sort(byMatch)
+        const top = ranked.slice(0, TOP)
+        const dropped = droppedByReviews(ranked, you)
+        const cards = await withSinceLastVisit([...top, ...dropped], visits, { score: you.score, profile: you.profile })
+        const told = await withReviewChange(cards, you, user)
+        return { ...answer, venues: told.slice(0, top.length), droppedByReviews: told.slice(top.length) }
       }
 
-      const members = await Promise.all(people.map((p) => rankedFor(p, allowed, scene)))
+      const members = await Promise.all(people.map((p) => rankedFor(p, allowed, scene, crowd)))
       const result = mode === 'surprise' ? groupSurprise(members, exclude) : groupFind(members)
       return {
         ...answer,
@@ -175,7 +249,7 @@ export function createRecommendationService({
       if (!since) return null
       const changes = await catalog.venueChanges(venueId, since).catch(() => null)
       if (!changes) return null
-      const { ranked, score } = await rankedFor(me, withLivePrices([venue], prices), { raining: false, mood: null })
+      const { ranked, score } = await rankedFor(me, withLivePrices([venue], prices), { raining: false, mood: null }, await crowdAt([venueId]))
       const match = matchThenAndNow(ranked[0], changes, score)
       if (!match) return null
       // Keyed on what Claude would be told, so any different change gets a fresh answer.
@@ -187,11 +261,12 @@ export function createRecommendationService({
 
     // Match % includes the walk from `from`, so it agrees with the feed's.
     async search(user, query, limit, from = SMU) {
-      const [state, prices] = await Promise.all([learners.read(user.id, user.me.displayName), livePrices()])
+      const [state, prices, crowd] = await Promise.all([learners.read(user.id, user.me.displayName), livePrices(), crowdAt(null)])
       const yours = yourScoresByVenue(state.reviews)
+      const community = reviewsFor(viewerFrom({ id: user.id }, state), crowd)
       const results = searchVenues(registry.searchIndex, query, {
         limit,
-        scoreFn: (venue) => rankVenues(withLivePrices([withWalkFrom(from, venue)], prices), state.profile)[0].matchScore,
+        scoreFn: (venue) => rankVenues(withLivePrices([withWalkFrom(from, venue)], prices), state.profile, { community })[0].matchScore,
       })
       return results.map(({ venue, matchScore, highlight }) => ({
         id: venue.id,
@@ -206,6 +281,21 @@ export function createRecommendationService({
       }))
     },
   }
+}
+
+// Places reviews pushed out of your top 10, so they don't just vanish: in the top 10
+// without reviews, not with them, and moved enough to mention. Biggest drop first.
+function droppedByReviews(ranked, you) {
+  if (you.community.size === 0) return []
+  const inTop = new Set(ranked.slice(0, TOP).map((v) => v.id))
+  const now = new Map(ranked.map((v) => [v.id, v]))
+  return you.rankedWithoutReviews().sort(byMatch).slice(0, TOP)
+    .filter((v) => !inTop.has(v.id))
+    .map((v) => ({ venue: now.get(v.id), drop: v.matchScore - now.get(v.id).matchScore }))
+    .filter(({ drop }) => drop >= BANNER_MIN_POINTS)
+    .sort((a, b) => b.drop - a.drop)
+    .slice(0, MAX_DROPPED)
+    .map(({ venue }) => venue)
 }
 
 // The venue with its walk time from `from`, when it has coordinates.

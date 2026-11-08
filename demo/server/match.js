@@ -21,6 +21,18 @@ export const DEMO_USER = {
 }
 
 const MOODS = ['none', 'soupy', 'spicy', 'light']
+const clamp01 = (v) => Math.min(1, Math.max(0, v))
+const MIDDLE = 0.5 // where a venue with no data sits, before reviews say otherwise
+const AVOID_BELOW = 0.15 // a cuisine this low is one you avoid...
+const AVOID_DRAG = 30 // ...and at 0 its places lose this much on top of the cuisine term
+
+// A venue's spice or richness as reviews have moved it; unknown stays unknown.
+const believed = (value, shift = 0) => (value == null ? value : clamp01(value + shift))
+
+// With no spice or richness data there's no term to move, and a new one would raise the
+// score just for existing. So this is only the change: how much further from (or nearer
+// to) what you like the reviews put it, compared with an unremarkable venue.
+const reviewedOnly = (weight, shift, pref) => weight * (Math.abs(MIDDLE - pref) - Math.abs(clamp01(MIDDLE + shift) - pref))
 
 function prettyCuisine(cuisine) {
   return cuisine.replace(/-/g, ' ')
@@ -44,21 +56,36 @@ export function computeNovelty(venue, user) {
 function scoreVenue(venue, user, context) {
   let score = 50
   const why = []
+  const reviews = context.community?.get(venue.id) // other people's recent reviews (community.js)
+  const spice = believed(venue.spice, reviews?.spiceShift)
+  const richness = believed(venue.richness, reviews?.richnessShift)
 
   const hasCuisine = venue.cuisine != null
   const affinity = hasCuisine ? (user.cuisineAffinity[venue.cuisine] ?? 0.3) : 0.3
   score += 25 * affinity
   if (hasCuisine && affinity >= 0.7) why.push(`You love ${prettyCuisine(venue.cuisine)}`)
-
-  if (venue.spice != null) {
-    score += 15 * (1 - Math.abs(venue.spice - user.spicePref))
-    if (Math.abs(venue.spice - user.spicePref) <= 0.15) why.push('Matches your spice level')
+  // A cuisine at or near 0 (set by hand, or learned from panning it again and again) is
+  // one you avoid: its places drop hard, the drag fading out by AVOID_BELOW.
+  if (hasCuisine && affinity < AVOID_BELOW) {
+    score -= AVOID_DRAG * (1 - affinity / AVOID_BELOW)
+    why.push(`You avoid ${prettyCuisine(venue.cuisine)}`)
   }
 
-  if (venue.richness != null) {
-    score += 10 * (1 - Math.abs(venue.richness - user.richnessPref))
-    if (Math.abs(venue.richness - user.richnessPref) <= 0.15) why.push('As hearty as you like it')
+  if (spice != null) {
+    score += 15 * (1 - Math.abs(spice - user.spicePref))
+    if (Math.abs(spice - user.spicePref) <= 0.15) why.push('Matches your spice level')
+  } else if (reviews?.spiceShift) {
+    score += reviewedOnly(15, reviews.spiceShift, user.spicePref)
   }
+
+  if (richness != null) {
+    score += 10 * (1 - Math.abs(richness - user.richnessPref))
+    if (Math.abs(richness - user.richnessPref) <= 0.15) why.push('As hearty as you like it')
+  } else if (reviews?.richnessShift) {
+    score += reviewedOnly(10, reviews.richnessShift, user.richnessPref)
+  }
+
+  if (reviews) score += reviews.nudge
 
   if (venue.priceTier != null) {
     const pricePenalty = 8 * Math.max(0, venue.priceTier - user.priceComfort)
@@ -73,7 +100,7 @@ function scoreVenue(venue, user, context) {
     : null
   if (sim != null) {
     score += 12 * Math.max(0, Math.min(1, (sim - 0.4) / 0.5))
-    if (sim >= 0.75) why.push("Similar to places you've rated well")
+    if (sim >= 0.75) why.push(context.taste.why ?? "Similar to places you've rated well")
   }
 
   // Distance is from where the user is; a request without one scores taste alone.
@@ -105,15 +132,15 @@ function scoreVenue(venue, user, context) {
     } else {
       score -= 10
     }
-  } else if (context.mood === 'spicy' && venue.spice != null) {
-    if (venue.spice >= 0.6) {
+  } else if (context.mood === 'spicy' && spice != null) {
+    if (spice >= 0.6) {
       score += 15
       why.push('Brings the heat')
     } else {
       score -= 10
     }
-  } else if (context.mood === 'light' && venue.richness != null) {
-    if (venue.richness <= 0.35) {
+  } else if (context.mood === 'light' && richness != null) {
+    if (richness <= 0.35) {
       score += 15
       why.push('Light pick')
     } else {
@@ -148,10 +175,11 @@ export function rankVenues(venues, user, context = {}) {
   const mood = MOODS.includes(context.mood) ? context.mood : 'none'
   const raining = Boolean(context.raining)
   const taste = context.taste?.store && context.taste.vector ? context.taste : null
+  const community = context.community ?? null
 
   return venues
     .map((venue) => {
-      const { score, why } = scoreVenue(venue, user, { raining, mood, taste })
+      const { score, why } = scoreVenue(venue, user, { raining, mood, taste, community })
       return {
         ...venue,
         matchScore: score,

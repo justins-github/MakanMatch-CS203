@@ -55,5 +55,19 @@ export const postBeliReview = (dishId, sentiment, insertIndex, duels, text) =>
 // Takes back the Taste DNA change from the review you just posted (the review stays).
 export const undoReview = (dishId, at) => request('/api/reviews/undo', { method: 'POST', body: { dishId, at } })
 
+// Taste sliders (admins): your taste as sliders, and saving them into your real taste.
+export const getDials = () => request('/api/profile/dials')
+export const putDials = (body) => request('/api/profile/dials', { method: 'PUT', body })
+
+// The review bomb (admins): three demo accounts pan one dish at a place, and take it back.
+export const getReviewBomb = () => request('/api/demo/review-bomb')
+export const dropReviewBomb = (venueId) => request('/api/demo/review-bomb', { method: 'POST', body: { venueId } })
+export const undoReviewBomb = () => request('/api/demo/review-bomb', { method: 'DELETE' })
+
+// Other people's reviews: a venue's, a reviewer's profile, and your kakis' recent eats.
+export const getVenueReviews = (venueId) => request(`/api/venues/${encodeURIComponent(venueId)}/reviews`)
+export const getReviewer = (id) => request(`/api/reviewers/${encodeURIComponent(id)}`)
+export const getRecentEats = () => request('/api/recent-eats')
+
 // Forgets everything you taught the AI (only yours).
 export const postReset = () => request('/api/reset', { method: 'POST' })

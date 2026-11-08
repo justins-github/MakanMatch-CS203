@@ -208,15 +208,69 @@
   text-transform: uppercase;
 }
 
-/* ---------- Me: owner and admin tools, opened from the profile ---------- */
+/* ---------- Me: labelled sections (Account, Venues, Admin), then the footer ---------- */
 
-.me-rows {
+.me-section {
   display: flex;
   flex-direction: column;
+  gap: 6px;
+}
+
+.me-section-label {
+  margin: 6px 0 0 2px;
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+/* One card per section; its folds and links sit in it as rows. */
+.me-group {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border: var(--line);
   border-radius: 12px;
+  background: var(--paper);
   box-shadow: 3px 3px 0 var(--ink);
-  overflow: hidden;
+}
+
+.me-group > .fold {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.me-group > :not(:first-child) {
+  border-top: 1.5px dashed var(--ink-soft);
+}
+
+.me-group > .fold > .fold-heading .fold-head {
+  border-radius: 0;
+}
+
+.me-group > .fold > .fold-heading .fold-title,
+.me-group .me-row-title {
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.me-group-row {
+  padding: 10px 14px;
+}
+
+.me-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 6px;
+  padding-top: 16px;
+  border-top: 1.5px dashed var(--ink-soft);
 }
 
 .me-row {

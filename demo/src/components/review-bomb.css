@@ -1,0 +1,42 @@
+/* The review bomb's admin block at the bottom of a card's drawer (ReviewBomb.jsx). */
+
+.card-bomb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1.5px dashed var(--ink-soft);
+}
+
+.card-bomb-text {
+  flex: 1 1 160px;
+  min-width: 0;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
+
+.card-bomb-label {
+  display: block;
+  margin-bottom: 1px;
+  font-family: var(--font-data);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.card-bomb .btn {
+  padding: 6px 12px;
+  border-width: 1.5px;
+  font-size: 12.5px;
+  box-shadow: none;
+}
+
+.card-bomb-error {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--chili);
+}

@@ -7,6 +7,8 @@ import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { config } from './config.js'
 import { createAccountClient } from './clients/accountClient.js'
+import { communityRoutes } from './routes/community.js'
+import { createCommunityService } from './services/communityService.js'
 import { createAiClient } from './clients/aiClient.js'
 import { createChangeExplainer } from './changeExplainer.js'
 import { createCatalogClient } from './clients/catalogClient.js'
@@ -24,12 +26,14 @@ import { createSummaryWriter } from './tasteSummary.js'
 import { contextRoutes } from './routes/context.js'
 import { locationRoutes } from './routes/location.js'
 import { profileRoutes } from './routes/profile.js'
+import { reviewBombRoutes } from './routes/reviewBomb.js'
 import { recommendationRoutes } from './routes/recommendations.js'
 import { reviewRoutes } from './routes/reviews.js'
 import { venueRoutes } from './routes/venues.js'
 import { dbLearnerStore, memoryLearnerStore } from './services/learnerStore.js'
 import { createProfileService } from './services/profileService.js'
 import { createRecommendationService } from './services/recommendationService.js'
+import { createReviewBombService } from './services/reviewBombService.js'
 import { createReviewService } from './services/reviewService.js'
 import { fileVectorSource, pgVectorSource } from './services/tasteVectors.js'
 import { loadVectorStore } from './vectors.js'
@@ -71,7 +75,9 @@ const recommendations = createRecommendationService({
 const reviews = createReviewService({
   registry, learners, catalog, seedDishes, vectors, reader: createReviewReader({ ai }), estimator: createDishEstimator({ ai }),
 })
-const profiles = createProfileService({ learners, summaries: createSummaryWriter({ ai }) })
+const profiles = createProfileService({ learners, summaries: createSummaryWriter({ ai }), registry })
+const community = createCommunityService({ learners, accounts, registry })
+const reviewBomb = createReviewBombService({ accounts, reviews, learners, registry, password: config.seedPersonaPassword })
 const authenticated = requireAuth({
   verifyToken: createTokenVerifier({ supabaseUrl: config.supabaseUrl, jwtSecret: config.jwtSecret }),
   accounts,
@@ -87,6 +93,8 @@ app.use(locationRoutes({ oneMap: createOneMapClient() }))
 app.use(venueRoutes({ recommendations }))
 app.use(reviewRoutes({ reviews }))
 app.use(profileRoutes({ profiles }))
+app.use(communityRoutes({ community }))
+app.use(reviewBombRoutes({ reviewBomb }))
 app.use(errorHandler)
 
 app.listen(config.port, () => console.log(`engine api on :${config.port}`))

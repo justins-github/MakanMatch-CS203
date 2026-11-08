@@ -200,6 +200,13 @@ test('a venue close to the taste vector scores higher and gets the similarity ch
   assert.ok(!bottom.why.includes("Similar to places you've rated well"))
 })
 
+test('a taste vector can say where it came from', () => {
+  const taste = { ...tasteStore(), why: 'Close to the taste you set' }
+  const [top] = rankVenues([makeBare({ id: 'n', gersId: 'near' })], DEMO_USER, { ...CTX, taste })
+  assert.ok(top.why.includes('Close to the taste you set'))
+  assert.ok(!top.why.includes("Similar to places you've rated well"))
+})
+
 test('the similarity term stays silent without a taste vector or without a venue vector', () => {
   const taste = tasteStore()
   const near = makeBare({ id: 'n', gersId: 'near' })
@@ -212,6 +219,98 @@ test('the similarity term stays silent without a taste vector or without a venue
   for (const v of [plain, noVector, notInStore]) assert.ok(!v.why.some((w) => w.startsWith('Similar')))
 })
 
+// --- a cuisine you avoid ---------------------------------------------------------
+const withTurkish = (affinity) => ({ ...DEMO_USER, cuisineAffinity: { ...DEMO_USER.cuisineAffinity, turkish: affinity }, recentlyEaten: [] })
+const turksAt = (affinity) => rankVenues([makeVenue({ id: 'turks', cuisine: 'turkish' })], withTurkish(affinity), CTX)[0]
+
+test('a cuisine at 0 drags its places down hard, and says why', () => {
+  const avoided = turksAt(0)
+  const neutral = turksAt(0.3)
+  // 7.5 less from the cuisine itself, and 30 more for avoiding it.
+  assert.ok(neutral.matchScore - avoided.matchScore >= 37, `${neutral.matchScore} vs ${avoided.matchScore}`)
+  assert.ok(avoided.why.includes('You avoid turkish'))
+})
+
+test('the drag fades out as the cuisine comes back up, gone by 0.15', () => {
+  assert.ok(turksAt(0.15).matchScore - turksAt(0.1).matchScore >= 10)
+  assert.ok(!turksAt(0.15).why.some((w) => w.startsWith('You avoid')))
+  const step = turksAt(0.2).matchScore - turksAt(0.15).matchScore // just the cuisine term, 25 x 0.05, rounded
+  assert.ok(step >= 1 && step <= 2, `step ${step}`)
+})
+
 test('a venue\'s typical price maps smoothly onto the 0-2 price scale', () => {
   assert.deepEqual([3, 4, 6.5, 9, 10.5, 14, 30].map(priceLevel), [0, 0, 0.5, 1, 1.3, 2, 2])
+})
+
+// What other people's reviews do (community.js works out these numbers). The venues here
+// know only what's listed, so each score is easy to check by hand from 50 + 7.5 (no cuisine).
+const shy = { ...DEMO_USER, spicePref: 0.15, recentlyEaten: [] }
+const lover = { ...shy, spicePref: 0.9 }
+const mild = { id: 'v', spice: 0.3 }
+const unknown = { id: 'v' }
+const reviews = (input) => ({ community: new Map([['v', { spiceShift: 0, richnessShift: 0, nudge: 0, ...input }]]) })
+const scoreOf = (venue, user, context) => rankVenues([venue], user, context)[0].matchScore
+
+test('with no reviews at a venue, the score is what it always was', () => {
+  assert.equal(scoreOf(mild, shy), 70)
+  assert.equal(scoreOf(mild, shy, { community: new Map() }), 70)
+  assert.equal(scoreOf(mild, shy, { community: new Map([['other', { spiceShift: 0.5, richnessShift: 0, nudge: -8 }]]) }), 70)
+})
+
+test('believing a venue is hotter lowers the match for someone spice-shy', () => {
+  assert.equal(scoreOf(mild, shy, reviews({ spiceShift: 0.5 })), 63)
+})
+
+test('believing a venue is hotter raises the match for a spice lover', () => {
+  assert.ok(scoreOf(mild, lover, reviews({ spiceShift: 0.5 })) > scoreOf(mild, lover))
+})
+
+test('the verdict adds or takes points directly', () => {
+  assert.equal(scoreOf(mild, shy, reviews({ nudge: -8 })), 62)
+  assert.equal(scoreOf(mild, shy, reviews({ nudge: 8 })), 78)
+})
+
+test('on a venue with no spice data, "too spicy" can only hurt someone spice-shy', () => {
+  assert.equal(scoreOf(unknown, shy), 58)
+  assert.equal(scoreOf(unknown, shy, reviews({ spiceShift: 0.5 })), 50)
+})
+
+test('on a venue with no spice data, "too spicy" lifts a spice lover', () => {
+  assert.equal(scoreOf(unknown, lover, reviews({ spiceShift: 0.5 })), 62)
+})
+
+test('richness works the same way, for venues with and without data', () => {
+  const rich = { id: 'v', richness: 0.3 }
+  const lightEater = { ...shy, richnessPref: 0.15 }
+  assert.equal(scoreOf(rich, lightEater), 66)
+  assert.equal(scoreOf(rich, lightEater, reviews({ richnessShift: 0.5 })), 61)
+  assert.equal(scoreOf(unknown, lightEater, reviews({ richnessShift: 0.5 })), 53)
+})
+
+test('the moods follow what we now believe about the venue', () => {
+  assert.equal(scoreOf(mild, shy, { mood: 'spicy' }), 60)
+  const moved = rankVenues([mild], shy, { mood: 'spicy', ...reviews({ spiceShift: 0.5 }) })[0]
+  assert.equal(moved.matchScore, 78)
+  assert.ok(moved.why.includes('Brings the heat'))
+})
+
+test('the spice chip follows what we now believe about the venue', () => {
+  const user = { ...shy, spicePref: 0.2 }
+  assert.ok(rankVenues([mild], user)[0].why.includes('Matches your spice level'))
+  assert.ok(!rankVenues([mild], user, reviews({ spiceShift: 0.5 }))[0].why.includes('Matches your spice level'))
+})
+
+test('a venue with no spice data gets no spice chip from reviews', () => {
+  const user = { ...shy, spicePref: 0.9 }
+  assert.ok(!rankVenues([unknown], user, reviews({ spiceShift: 0.4 }))[0].why.includes('Matches your spice level'))
+})
+
+test('reviews do not raise the ceiling on what we know about a venue', () => {
+  assert.equal(scoreOf(unknown, shy, reviews({ nudge: 60 })), 80)
+})
+
+test('the venue keeps its own spice and richness on the way out', () => {
+  const venue = rankVenues([{ id: 'v', spice: 0.3, richness: 0.4 }], shy, reviews({ spiceShift: 0.5, richnessShift: 0.2 }))[0]
+  assert.equal(venue.spice, 0.3)
+  assert.equal(venue.richness, 0.4)
 })

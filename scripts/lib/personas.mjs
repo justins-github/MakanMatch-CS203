@@ -4,6 +4,12 @@
 //
 // taste(dish) returns -1..1: how much this persona likes a seed dish, from its
 // curated features. It decides the sentiment they post in the simulation.
+//
+// The spice-shy diners have a fixed history instead (seed-review-bomb.mjs posts it), so
+// the review bomb demo starts from the same place every time.
+
+const HOT = ['tom-yum-goong', 'sambal-chicken-rice', 'ayam-penyet', 'mee-rebus', 'green-curry', 'soto-ayam']
+const MILD = ['chwee-kueh-classic', 'batang-fish-soup', 'roasted-chicken-rice', 'begedil', 'fried-fish-beehoon', 'mango-sticky-rice']
 
 export const PERSONAS = [
   {
@@ -45,6 +51,30 @@ export const PERSONAS = [
     displayName: 'Thura',
     about: 'runs Yangon Flavours',
     owns: 'yangon-flavours',
+  },
+  {
+    username: 'sam_mild',
+    displayName: 'Sam',
+    about: 'presents the review bomb demo, keeps the spice low',
+    history: { dislikes: HOT.slice(0, 4), loves: MILD.slice(0, 4) },
+  },
+  {
+    username: 'weiling_mild',
+    displayName: 'Wei Ling',
+    about: 'keeps the spice low',
+    history: { dislikes: HOT.slice(0, 3), loves: MILD.slice(1, 5) },
+  },
+  {
+    username: 'hafiz_nospice',
+    displayName: 'Hafiz',
+    about: 'keeps the spice low',
+    history: { dislikes: HOT.slice(2, 5), loves: MILD.slice(0, 3) },
+  },
+  {
+    username: 'nadia_mild',
+    displayName: 'Nadia',
+    about: 'keeps the spice low',
+    history: { dislikes: HOT.slice(1, 4), loves: MILD.slice(2, 6) },
   },
   {
     username: 'siti_soto',

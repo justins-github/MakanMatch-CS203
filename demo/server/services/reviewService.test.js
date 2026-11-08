@@ -66,6 +66,21 @@ test('loving a community dish, even over a spicy seed dish, leaves spice and ric
   assert.equal(second.profile.adventurousness, first.profile.adventurousness)
 })
 
+// A taste set by hand (an admin's sliders) lasts until the next review; undoing that
+// review puts it back.
+test('a review hands a taste set by hand back to learning, and undo hands it back', async () => {
+  const learners = memoryLearnerStore({ starter: starterProfile })
+  await learners.update(diner.id, 'Mei', async (state) => {
+    state.profile.setByHand = true
+    return { result: null }
+  })
+  const reviews = createReviewService({ registry, learners, catalog: fakeCatalog(), seedDishes, vectors: { size: 0 } })
+  const { review } = await reviews.submitBeli(diner, beli('chicken-doner-wrap'))
+  assert.equal((await learners.read(diner.id, 'Mei')).profile.setByHand, undefined)
+  await reviews.undoLatest(diner, { dishId: review.dishId, at: review.at })
+  assert.equal((await learners.read(diner.id, 'Mei')).profile.setByHand, true)
+})
+
 // A review service whose estimator answers from `byDish`, recording what it was asked about.
 function withEstimates(byDish) {
   const asked = []

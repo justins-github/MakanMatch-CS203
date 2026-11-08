@@ -93,7 +93,7 @@ function Empty({ mode, group, walkMin }) {
   )
 }
 
-export default function Feed({ mode, data, onFind, onSurprise, onAnother, onPrevious, onBack, onReview }) {
+export default function Feed({ mode, data, onFind, onSurprise, onAnother, onPrevious, onBack, onReview, onOpenReviewer, moves = null }) {
   const [openId, setOpenId] = useState(null) // one card open at a time
   if (mode === 'idle') {
     return (
@@ -116,6 +116,20 @@ export default function Feed({ mode, data, onFind, onSurprise, onAnother, onPrev
 
   if (!data) return <div className="loading">Finding your matches…</div>
 
+  const dropped = data.droppedByReviews ?? []
+  const card = (venue, i) => (
+    <VenueCard
+      key={venue.id}
+      venue={venue}
+      index={i}
+      open={openId === venue.id}
+      onToggle={() => setOpenId((id) => (id === venue.id ? null : venue.id))}
+      onReview={onReview}
+      onOpenReviewer={onOpenReviewer}
+      move={moves?.get(venue.id) ?? null}
+    />
+  )
+
   // keyed on the ranking inputs so the entrance animation replays on re-rank
   const rankKey = `${data.mode}-${data.mood}-${data.context.raining}-${data.venues[0]?.id ?? 'none'}`
 
@@ -129,16 +143,10 @@ export default function Feed({ mode, data, onFind, onSurprise, onAnother, onPrev
       <DietaryNote dietary={data.dietary} group={data.group} />
       <OwnerReportsNote reports={data.ownerReports} />
       {data.venues.length === 0 && <Empty mode={mode} group={data.group} walkMin={data.near?.walkMin ?? 20} />}
-      {data.venues.map((venue, i) => (
-        <VenueCard
-          key={venue.id}
-          venue={venue}
-          index={i}
-          open={openId === venue.id}
-          onToggle={() => setOpenId((id) => (id === venue.id ? null : venue.id))}
-          onReview={onReview}
-        />
-      ))}
+      {data.venues.map(card)}
+      {/* Reviews pushed these out of your top 10; say so, so they don't just vanish. */}
+      {dropped.length > 0 && <div className="rv-dropped-title">Dropped out because of recent reviews</div>}
+      {dropped.map((venue, i) => card(venue, data.venues.length + i))}
       {mode === 'surprise' && data.venues.length > 0 && (
         <button className="teach-btn" onClick={onAnother}>
           🎲 Another surprise

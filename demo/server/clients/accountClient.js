@@ -5,6 +5,21 @@ import { badRequest, unavailable } from '../errors.js'
 
 export function createAccountClient({ baseUrl, fetchImpl = fetch, ttlMs = 30_000, now = Date.now }) {
   const cache = new Map()
+
+  async function getJson(path, token) {
+    let res
+    try {
+      res = await fetchImpl(`${baseUrl}${path}`, {
+        headers: { authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(5000),
+      })
+    } catch {
+      throw unavailable('The account service is unreachable - is it running?')
+    }
+    if (res.ok) return res.json()
+    throw unavailable(`The account service answered ${res.status}`)
+  }
+
   return {
     // The caller's MeResponse, or null when account-service rejects the token
     // (expired, or the account was disabled).
@@ -49,6 +64,38 @@ export function createAccountClient({ baseUrl, fetchImpl = fetch, ttlMs = 30_000
       if (res.status === 400 || res.status === 403) {
         throw badRequest("Someone you picked isn't your kaki any more - go back and pick again")
       }
+      throw unavailable(`The account service answered ${res.status}`)
+    },
+
+    // Who these people are: [{ id, displayName, username }], leaving out unknown and
+    // disabled accounts. Not cached, so someone disabled drops out straight away.
+    people(token, ids) {
+      return getJson(`/api/people?ids=${ids.map(encodeURIComponent).join(',')}`, token)
+    },
+
+    // The caller's kakis and requests: { kakis, incoming, outgoing }. Not cached, so a
+    // removed kaki drops out straight away.
+    kakis(token) {
+      return getJson('/api/kakis', token)
+    },
+
+    // Signs in with a username (or email) and password: the access token, or null when
+    // account-service turns it down. Only the admin's review bomb uses it, for the seeded
+    // demo accounts (services/reviewBombService.js).
+    async signIn(identifier, password) {
+      let res
+      try {
+        res = await fetchImpl(`${baseUrl}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ identifier, password }),
+          signal: AbortSignal.timeout(10_000),
+        })
+      } catch {
+        throw unavailable('The account service is unreachable - is it running?')
+      }
+      if (res.ok) return (await res.json()).accessToken
+      if (res.status === 400 || res.status === 401) return null
       throw unavailable(`The account service answered ${res.status}`)
     },
   }

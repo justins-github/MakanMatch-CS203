@@ -105,9 +105,13 @@ export function createReviewService({
 
   // Runs one learning step under the user's lock and persists the result,
   // including the refreshed taste vector (an AI output we keep).
+  // A review teaches the profile, so a taste set by hand (the Taste DNA sliders) goes
+  // back to being learned. The review's undo snapshot was taken before, so undo puts the
+  // hand-set taste back.
   function learn(user, step) {
     return learners.update(user.id, user.me.displayName, async (state) => {
       const result = await step(state)
+      delete state.profile.setByHand
       const tasteVector = await learnedVector(vectors, state.reviews, registry.venueById).catch(() => undefined)
       return { result, review: result.review, tasteVector }
     })

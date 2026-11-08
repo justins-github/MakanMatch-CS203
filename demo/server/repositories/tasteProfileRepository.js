@@ -8,6 +8,16 @@ export function tasteProfileRepository(db) {
       return rows[0]?.profile ?? null
     },
 
+    // user id -> their profile; people with none aren't in the map.
+    async getMany(userIds) {
+      if (userIds.length === 0) return new Map()
+      const { rows } = await db.query(
+        'select user_id, profile from taste.taste_profiles where user_id = any($1::uuid[])',
+        [userIds],
+      )
+      return new Map(rows.map((row) => [row.user_id, row.profile]))
+    },
+
     async save(userId, profile) {
       await db.query(
         `insert into taste.taste_profiles (user_id, profile) values ($1, $2::jsonb)

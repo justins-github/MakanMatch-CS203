@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 const PET_KEY = 'mm-makan-pet'
 const DAY_SIMULATOR_KEY = 'mm-makan-pet-day-offset'
+const MINIMIZED_KEY = 'mm-makan-pet-minimized'
 const DAY_MS = 24 * 60 * 60 * 1000
 const STAGES = [
   { name: 'Baby otter', startsAt: 0, scale: 'baby' },
@@ -75,6 +76,15 @@ function readPet(accountId) {
   }
 }
 
+// Whether this account keeps Makan minimised; if storage can't be read, it starts open.
+function readMinimized(accountId) {
+  try {
+    return window.localStorage.getItem(`${MINIMIZED_KEY}:${accountId}`) === '1'
+  } catch {
+    return false
+  }
+}
+
 function stageFor(streak) {
   return STAGES.reduce((current, stage) => (streak >= stage.startsAt ? stage : current), STAGES[0])
 }
@@ -145,11 +155,14 @@ export function useMakanPet(accountId) {
   const [simulator, setSimulator] = useState(() => readDayOffset(accountId))
   const simulationOffset = simulator.offset
   const [today, setToday] = useState(() => addDays(singaporeDate(), readDayOffset(accountId).offset))
+  const [minimized, setMinimized] = useState(() => readMinimized(accountId))
   const key = storageKey(accountId)
   const simulatorKey = `${DAY_SIMULATOR_KEY}:${accountId}`
+  const minimizedKey = `${MINIMIZED_KEY}:${accountId}`
 
   useEffect(() => {
     setPet(readPet(accountId))
+    setMinimized(readMinimized(accountId))
     const initial = readDayOffset(accountId)
     setSimulator(initial)
     const refresh = () => {
@@ -211,10 +224,22 @@ export function useMakanPet(accountId) {
     }
   }, [key, simulatorKey])
 
-  return { pet, today, simulator, markReview, advanceDay, resetDaySimulator }
+  // Remembered per account; if storage refuses, it still minimises for this visit.
+  const toggleMinimized = useCallback(() => {
+    const next = !minimized
+    setMinimized(next)
+    try {
+      if (next) window.localStorage.setItem(minimizedKey, '1')
+      else window.localStorage.removeItem(minimizedKey)
+    } catch {
+      // nothing to do: the next visit starts open
+    }
+  }, [minimized, minimizedKey])
+
+  return { pet, today, simulator, minimized, toggleMinimized, markReview, advanceDay, resetDaySimulator }
 }
 
-function displayDate(date) {
+export function displayDate(date) {
   const [year, month, day] = date.split('-').map(Number)
   return new Intl.DateTimeFormat('en-SG', {
     day: 'numeric',
@@ -224,43 +249,53 @@ function displayDate(date) {
   }).format(new Date(Date.UTC(year, month - 1, day)))
 }
 
-export default function MakanPet({
-  pet,
-  today,
-  simulator,
-  minimized,
-  onToggleMinimized,
-  onCare,
-  onNextDay,
-  onResetSimulator,
-}) {
+// Makan, the otter on For you and Review: a review a day keeps it growing, a missed day
+// and it faints. One line says what to do; admins move the day from the Demo controls.
+// Minimised, it's a small pill that opens it again.
+export default function MakanPet({ pet, today, minimized, onToggleMinimized, onCare }) {
   const missedDay = pet.lastReviewDate && daysBetween(today, pet.lastReviewDate) > 1
   const fainted = Boolean(missedDay)
   const stage = stageFor(pet.streak)
   const progress = progressFor(pet.streak, stage)
+  const streak = `🔥 ${pet.streak} ${pet.streak === 1 ? 'day' : 'days'}`
   const message = fainted
-    ? 'Makan missed a day, is starving and fainted. Make a review to wake them up and start a new streak.'
+    ? 'Makan missed a day and fainted. Review a dish to wake them up.'
     : pet.lastReviewDate === today
-      ? 'Makan is happy and cared for today. See you tomorrow!'
+      ? 'Fed for today. See you tomorrow!'
       : pet.lastReviewDate
-        ? 'Make a review today to keep Makan growing.'
-        : 'Make your first review to meet Makan and start a streak.'
+        ? 'Review a dish today to keep Makan growing.'
+        : 'Review a dish to meet Makan and start a streak.'
+
+  if (minimized) {
+    return (
+      <button
+        type="button"
+        className={`makan-pet-mini${fainted ? ' is-fainted' : ''}`}
+        onClick={onToggleMinimized}
+        aria-expanded="false"
+        aria-label={`Show Makan Pet (${fainted ? 'fainted' : streak})`}
+      >
+        <span className="makan-pet-mini-art" aria-hidden="true">
+          <Otter stage={stage} fainted={fainted} />
+        </span>
+        Makan · {fainted ? 'fainted' : streak}
+        <span className="makan-pet-mini-open" aria-hidden="true">⌄</span>
+      </button>
+    )
+  }
 
   return (
-    <section className={`makan-pet${fainted ? ' is-fainted' : ''}${minimized ? ' is-minimized' : ''}`} aria-label="Makan Pet">
+    <section className={`makan-pet${fainted ? ' is-fainted' : ''}`} aria-label="Makan Pet">
       <div className="makan-pet-picture">
         <Otter stage={stage} fainted={fainted} />
       </div>
       <div className="makan-pet-info">
-        <div className="makan-pet-heading">
-          <div>
-            <div className="makan-pet-eyebrow">Makan Pet</div>
-            <h2>{stage.name}</h2>
-          </div>
-          <span className="makan-pet-streak">
-            {pet.streak} {pet.streak === 1 ? 'day' : 'days'} 🔥
+        <h2>
+          Makan
+          <span className="makan-pet-stage">
+            {stage.name.toLowerCase()} · {streak}
           </span>
-        </div>
+        </h2>
         <p>{message}</p>
         <div className="makan-pet-progress" aria-label={`${Math.round(progress.value * 100)}% to the next growth stage`}>
           <span><i style={{ width: `${progress.value * 100}%` }} /></span>
@@ -269,29 +304,20 @@ export default function MakanPet({
       </div>
       <button
         type="button"
-        className="makan-pet-toggle"
+        className="makan-pet-hide"
         onClick={onToggleMinimized}
-        aria-expanded={!minimized}
-        aria-label={minimized ? 'Expand Makan Pet' : 'Minimize Makan Pet'}
-        title={minimized ? 'Expand pet' : 'Minimize pet'}
+        aria-expanded="true"
+        aria-label="Minimise Makan Pet"
+        title="Minimise"
       >
-        {minimized ? '⌄' : '⌃'}
+        ⌃
       </button>
       {onCare && (
         <button type="button" className="makan-pet-care" onClick={onCare} aria-label="Review a dish to care for Makan">
           Review
         </button>
       )}
-      <div className="makan-pet-simulator">
-        <span>{simulator.offset ? 'Test day' : 'Today'}: {displayDate(today)}</span>
-        <div>
-          <button type="button" onClick={onNextDay}>Next day →</button>
-          <button type="button" onClick={onResetSimulator}>Reset test</button>
-        </div>
-      </div>
-      {(pet.error || simulator.error) && (
-        <div className="makan-pet-error" role="status">{pet.error || simulator.error}</div>
-      )}
+      {pet.error && <div className="makan-pet-error" role="status">{pet.error}</div>}
     </section>
   )
 }

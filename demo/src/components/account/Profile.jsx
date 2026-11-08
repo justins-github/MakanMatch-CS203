@@ -9,21 +9,29 @@ import './account.css'
 const ROLE_LABEL = { USER: 'Diner', OWNER: 'Owner', ADMIN: 'Admin' }
 const CLAIM_LABEL = { PENDING: 'Waiting for an admin', APPROVED: 'Approved', REJECTED: 'Rejected', WITHDRAWN: 'Withdrawn' }
 
+// Name, username and dietary needs, saved together; only what changed is sent.
 function DetailsForm() {
   const { me, reloadMe } = useAuth()
+  const savedDietary = me.dietary ?? NO_DIETARY_NEEDS
   const [displayName, setDisplayName] = useState(me.displayName)
   const [username, setUsername] = useState(me.username ?? '')
+  const [dietary, setDietary] = useState(savedDietary)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState(null)
 
-  const changed = displayName.trim() !== me.displayName || username.trim() !== (me.username ?? '')
+  const namesChanged = displayName.trim() !== me.displayName || username.trim() !== (me.username ?? '')
+  const dietaryChanged = !sameDietaryNeeds(dietary, savedDietary)
+  const changed = namesChanged || dietaryChanged
 
   const save = async (e) => {
     e.preventDefault()
     setBusy(true)
     setMessage(null)
     try {
-      await updateMe({ displayName: displayName.trim(), username: username.trim() })
+      await updateMe({
+        ...(namesChanged ? { displayName: displayName.trim(), username: username.trim() } : {}),
+        ...(dietaryChanged ? { dietary } : {}),
+      })
       await reloadMe()
       setMessage({ ok: true, text: 'Saved.' })
     } catch (err) {
@@ -38,8 +46,11 @@ function DetailsForm() {
     setMessage(null)
   }
 
+  const who = me.username ? `${me.displayName} · @${me.username}` : me.displayName
+  const needs = dietaryLabels(savedDietary).join(', ') || 'no dietary needs'
+
   return (
-    <Fold id="details" title="Your details" summary={me.username ? `${me.displayName} · @${me.username}` : me.displayName} onSubmit={save}>
+    <Fold id="details" title="Your details" summary={`${who} · ${needs}`} onSubmit={save}>
       <label className="field">
         <span>Display name</span>
         <input value={displayName} onChange={edit(setDisplayName)} maxLength={40} required />
@@ -56,55 +67,21 @@ function DetailsForm() {
         />
         <small>Sign in with this instead of your email. 3-20 letters, digits or _, starting with a letter.</small>
       </label>
+      <div className="field">
+        <span>Dietary needs</span>
+        <DietaryPicker
+          folded
+          value={dietary}
+          onChange={(next) => {
+            setDietary(next)
+            setMessage(null)
+          }}
+        />
+      </div>
       {message && <div className={message.ok ? 'ok-note' : 'error'}>{message.text}</div>}
       <div className="row-actions">
         <button type="submit" className="btn go" disabled={!changed || busy}>
           {busy ? 'Saving…' : 'Save details'}
-        </button>
-      </div>
-      <Unsaved when={changed} />
-    </Fold>
-  )
-}
-
-function DietaryForm() {
-  const { me, reloadMe } = useAuth()
-  const saved = me.dietary ?? NO_DIETARY_NEEDS
-  const [dietary, setDietary] = useState(saved)
-  const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState(null)
-
-  const changed = !sameDietaryNeeds(dietary, saved)
-
-  const save = async (e) => {
-    e.preventDefault()
-    setBusy(true)
-    setMessage(null)
-    try {
-      await updateMe({ dietary })
-      await reloadMe()
-      setMessage({ ok: true, text: 'Saved.' })
-    } catch (err) {
-      setMessage({ ok: false, text: err.message })
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <Fold id="dietary" title="Dietary needs" summary={dietaryLabels(saved).join(', ') || 'Nothing set'} onSubmit={save}>
-      <DietaryPicker
-        folded
-        value={dietary}
-        onChange={(next) => {
-          setDietary(next)
-          setMessage(null)
-        }}
-      />
-      {message && <div className={message.ok ? 'ok-note' : 'error'}>{message.text}</div>}
-      <div className="row-actions">
-        <button type="submit" className="btn go" disabled={!changed || busy}>
-          {busy ? 'Saving…' : 'Save dietary needs'}
         </button>
       </div>
       <Unsaved when={changed} />
@@ -135,7 +112,7 @@ function PasswordForm() {
   }
 
   return (
-    <Fold id="password" title="Change password" onSubmit={save}>
+    <Fold id="password" title="Password" summary="Change your password" onSubmit={save}>
       <label className="field">
         <span>Current password</span>
         <input type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} required />
@@ -256,8 +233,19 @@ function Claims() {
   )
 }
 
-// children: what Me adds under the profile (owner and admin tools, View as, log out).
-export default function Profile({ children }) {
+// A labelled group of rows in one card, so the page reads as a few sections.
+export function MeSection({ label, children }) {
+  return (
+    <section className="me-section" aria-label={label}>
+      <h3 className="me-section-label">{label}</h3>
+      <div className="me-group">{children}</div>
+    </section>
+  )
+}
+
+// Who you are, then Account and Venues. `venueTools` is the row into the owner screens;
+// children is what Me adds below (the admin section, log out).
+export default function Profile({ venueTools = null, children }) {
   const { me } = useAuth()
   return (
     <main className="account">
@@ -273,12 +261,16 @@ export default function Profile({ children }) {
         </div>
       </header>
       <Accordion>
-        <DetailsForm />
-        <DietaryForm />
-        <Claims />
-        <PasswordForm />
+        <MeSection label="Account">
+          <DetailsForm />
+          <PasswordForm />
+        </MeSection>
+        <MeSection label="Venues">
+          <Claims />
+          {venueTools}
+        </MeSection>
+        {children}
       </Accordion>
-      {children}
     </main>
   )
 }
