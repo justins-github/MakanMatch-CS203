@@ -1,0 +1,35 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "web": {
+      "root": "demo/",
+      "framework": "vite"
+    },
+    "engine": {
+      "root": "demo/",
+      "framework": "express",
+      "entrypoint": "server/index.js",
+      "bindings": [
+        { "type": "service", "service": "account", "format": "url", "env": "ACCOUNT_SERVICE_URL" },
+        { "type": "service", "service": "catalog", "format": "url", "env": "CATALOG_SERVICE_URL" }
+      ]
+    },
+    "account": {
+      "root": "account-service/",
+      "runtime": "container"
+    },
+    "catalog": {
+      "root": "catalog-service/",
+      "runtime": "container",
+      "bindings": [
+        { "type": "service", "service": "account", "format": "url", "env": "ACCOUNT_SERVICE_URL" }
+      ]
+    }
+  },
+  "rewrites": [
+    { "source": "/api/:area(auth|me|claims|owner|admin|kakis)/:rest*", "destination": { "service": "account" } },
+    { "source": "/api/catalog/:rest*", "destination": { "service": "catalog" } },
+    { "source": "/api/:rest*", "destination": { "service": "engine" } },
+    { "source": "/(.*)", "destination": { "service": "web" } }
+  ]
+}
