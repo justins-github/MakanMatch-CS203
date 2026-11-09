@@ -19,6 +19,9 @@ export const config = {
   accountServiceUrl: withoutTrailingSlash(env.ACCOUNT_SERVICE_URL ?? 'http://localhost:8082'),
   catalogServiceUrl: withoutTrailingSlash(env.CATALOG_SERVICE_URL ?? 'http://localhost:8083'),
   db: databaseConfig(),
+  // The seeded demo accounts' shared password (scripts/seed-accounts.mjs). The engine uses
+  // it only for an admin's "Simulate review bomb"; without it that button says how to set up.
+  seedPersonaPassword: env.SEED_PERSONA_PASSWORD || null,
   // No key = AI off; everything that asks Claude has a non-AI fallback.
   ai: {
     apiKey: env.ANTHROPIC_API_KEY || null,

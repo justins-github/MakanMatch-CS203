@@ -54,8 +54,57 @@ export function reviewRepository(db) {
     async deleteForUser(userId) {
       await db.query('delete from taste.reviews where user_id = $1', [userId])
     },
+
+    // Other people's reviews: never undone ones, and never profile_before, which is private.
+    // venueIds null means every venue.
+    async listRecentAtVenues(venueIds, since) {
+      if (venueIds?.length === 0) return []
+      const { rows } = await db.query(
+        `select ${SHARED_COLUMNS} from taste.reviews
+          where ${SHAREABLE} and created_at >= $1 and ($2::text[] is null or venue_id = any($2::text[]))
+          order by created_at desc, id desc`,
+        [since, venueIds],
+      )
+      return rows.map(toSharedReview)
+    },
+
+    async listAtVenue(venueId, limit) {
+      const { rows } = await db.query(
+        `select ${SHARED_COLUMNS} from taste.reviews
+          where ${SHAREABLE} and venue_id = $1
+          order by created_at desc, id desc limit $2`,
+        [venueId, limit],
+      )
+      return rows.map(toSharedReview)
+    },
+
+    async listByUsers(userIds, { limit, since = null }) {
+      if (userIds.length === 0) return []
+      const { rows } = await db.query(
+        `select ${SHARED_COLUMNS} from taste.reviews
+          where ${SHAREABLE} and user_id = any($1::uuid[]) and ($2::timestamptz is null or created_at >= $2::timestamptz)
+          order by created_at desc, id desc limit $3`,
+        [userIds, since, limit],
+      )
+      return rows.map(toSharedReview)
+    },
+
+    // user id -> how many reviews they stand by.
+    async countByUsers(userIds) {
+      if (userIds.length === 0) return new Map()
+      const { rows } = await db.query(
+        `select user_id, count(*)::int as reviews from taste.reviews
+          where undone_at is null and user_id = any($1::uuid[]) group by user_id`,
+        [userIds],
+      )
+      return new Map(rows.map((row) => [row.user_id, row.reviews]))
+    },
   }
 }
+
+const SHARED_COLUMNS = 'user_id, dish_id, dish_name, venue_id, rating, sentiment, tags, body, signals, read_by, score10, predicted, actual, created_at'
+const SHAREABLE = 'undone_at is null and sentiment is not null'
+const toSharedReview = (row) => ({ userId: row.user_id, ...toReview(row) })
 
 // Row -> the review shape learn.js works with (undefined, not null, for "absent").
 function toReview(row) {

@@ -7,6 +7,12 @@
 //                                 saves the state, returns result (undone = the latest
 //                                 review was just undone; decided = new trend decisions)
 //   reset(userId)                 forgets everything the user taught the AI
+// And across users, newest first, each row { userId, ...review }. These leave out undone
+// reviews, reviews with no verdict and profileBefore, which is private:
+//   recentReviewsAt(venueIds, since)            since an ISO time; venueIds null = every venue
+//   reviewsAtVenue(venueId, limit)
+//   reviewsByPeople(userIds, { limit, since })  since optional
+//   peopleFacts(userIds)                        Map of user id -> { profile, reviewCount }
 // Updates for one user run one at a time, so two quick reviews can't overwrite
 // each other's profile changes.
 import { createState } from '../learn.js'
@@ -38,8 +44,34 @@ export function memoryLearnerStore({ starter }) {
   const histories = new Map()
   const oneAtATime = perUserQueue()
   const current = (userId, name) => states.get(userId) ?? createState(starter(name))
+  // Every shareable review, newest first; of two at the same moment, the later-written first.
+  const shared = () =>
+    [...states]
+      .flatMap(([userId, state]) =>
+        state.reviews
+          .filter((r) => !r.undone && r.sentiment)
+          .map(({ profileBefore, ...review }) => ({ userId, ...structuredClone(review) })))
+      .reverse()
+      .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
   return {
     kind: 'memory',
+    async recentReviewsAt(venueIds, since) {
+      return shared().filter((r) => (!venueIds || venueIds.includes(r.venueId)) && Date.parse(r.at) >= Date.parse(since))
+    },
+    async reviewsAtVenue(venueId, limit) {
+      return shared().filter((r) => r.venueId === venueId).slice(0, limit)
+    },
+    async reviewsByPeople(userIds, { limit, since = null }) {
+      return shared()
+        .filter((r) => userIds.includes(r.userId) && (!since || Date.parse(r.at) >= Date.parse(since)))
+        .slice(0, limit)
+    },
+    async peopleFacts(userIds) {
+      return new Map(userIds.filter((id) => states.has(id)).map((id) => {
+        const { profile, reviews } = states.get(id)
+        return [id, { profile: structuredClone(profile), reviewCount: reviews.filter((r) => !r.undone).length }]
+      }))
+    },
     async read(userId, name) {
       return structuredClone(current(userId, name))
     },
@@ -89,6 +121,16 @@ export function dbLearnerStore({ db, starter }) {
     kind: 'postgres',
     read,
     history,
+    recentReviewsAt: (venueIds, since) => reviewRepository(db).listRecentAtVenues(venueIds, since),
+    reviewsAtVenue: (venueId, limit) => reviewRepository(db).listAtVenue(venueId, limit),
+    reviewsByPeople: (userIds, options) => reviewRepository(db).listByUsers(userIds, options),
+    async peopleFacts(userIds) {
+      const [profiles, counts] = await Promise.all([
+        tasteProfileRepository(db).getMany(userIds),
+        reviewRepository(db).countByUsers(userIds),
+      ])
+      return new Map([...profiles].map(([id, profile]) => [id, { profile, reviewCount: counts.get(id) ?? 0 }]))
+    },
     update(userId, name, change) {
       return oneAtATime(userId, async () => {
         const state = await read(userId, name)

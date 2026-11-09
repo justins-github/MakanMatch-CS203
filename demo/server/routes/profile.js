@@ -23,5 +23,14 @@ export function profileRoutes({ profiles }) {
     res.json(await profiles.dismissSuggestion(req.user, req.body))
   }))
 
+  // Taste sliders (admins): your taste as sliders, and saving them into your real taste.
+  router.get('/api/profile/dials', asyncHandler(async (req, res) => {
+    res.json(await profiles.dials(req.user))
+  }))
+
+  router.put('/api/profile/dials', asyncHandler(async (req, res) => {
+    res.json(await profiles.tune(req.user, req.body))
+  }))
+
   return router
 }

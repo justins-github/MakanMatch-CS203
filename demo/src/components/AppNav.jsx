@@ -50,14 +50,18 @@ export const TABS = [
   ['me', 'Me', 'me'],
 ]
 
-// The weather on the left, you on the right; your avatar opens Me.
-export function TopBar({ weather, me, onOpenMe }) {
+// The weather on the left, you on the right; your avatar opens Me. Admins also get the
+// Demo controls (`demo`) beside it.
+export function TopBar({ weather, demo = null, me, onOpenMe }) {
   return (
     <header className="topbar">
       {weather}
-      <button type="button" className="topbar-me" onClick={onOpenMe} aria-label="Me" title={`Signed in as ${me.email}`}>
-        <Avatar id="you" name={me.displayName} />
-      </button>
+      <div className="topbar-end">
+        {demo}
+        <button type="button" className="topbar-me" onClick={onOpenMe} aria-label="Me" title={`Signed in as ${me.email}`}>
+          <Avatar id="you" name={me.displayName} />
+        </button>
+      </div>
     </header>
   )
 }

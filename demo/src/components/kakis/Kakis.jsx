@@ -9,8 +9,11 @@ import {
   requestKaki,
   updateGroup,
 } from '../../api/accountApi.js'
+import { getRecentEats } from '../../api/engineApi.js'
 import { useAuth } from '../../auth/AuthContext.jsx'
 import { Unsaved } from '../Accordion.jsx'
+import { ClosenessPill, Verdict } from '../reviews/ReviewParts.jsx'
+import { relativeDay } from '../reviews/when.js'
 import Avatar from './Avatar.jsx'
 import './kakis.css'
 
@@ -205,6 +208,57 @@ function Faces({ data, onKakis, onRemoved }) {
   )
 }
 
+// What your kakis have been eating, newest first. Loads on its own: the engine being
+// down shouldn't take the rest of this page with it.
+function RecentEats({ onOpenReviewer }) {
+  const [eats, setEats] = useState(null)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    let live = true
+    getRecentEats()
+      .then((answer) => live && setEats(answer.eats))
+      .catch((err) => live && setError(err.message))
+    return () => {
+      live = false
+    }
+  }, [])
+
+  return (
+    <section className="recent-eats">
+      <div className="kaki-label">Recent eats</div>
+      {error && <p className="panel-note">Recent eats unavailable: {error}</p>}
+      {!error && !eats && <p className="panel-note">Loading…</p>}
+      {eats?.length === 0 && <p className="panel-note">Nothing yet. When your kakis review a place, it shows up here.</p>}
+      {eats?.length > 0 && (
+        <div className="rv-panel">
+          {eats.map((eat) => (
+            <button
+              key={`${eat.reviewer.id}-${eat.dishId}-${eat.at}`}
+              type="button"
+              className="rv-row rv-tap"
+              onClick={() => onOpenReviewer(eat.reviewer.id)}
+            >
+              <Avatar id={eat.reviewer.id} name={eat.reviewer.displayName} />
+              <span className="rv-body">
+                <span className="rv-who plain">
+                  {eat.reviewer.displayName} {eat.venueName ? `ate at ${eat.venueName}` : `had ${eat.dishName}`}
+                </span>
+                <span className="rv-tags">
+                  <Verdict sentiment={eat.sentiment} />
+                  <ClosenessPill closeness={eat.closeness} />
+                </span>
+                {eat.text && <span className="rv-said" style={{ display: 'block' }}>{eat.text}</span>}
+                <span className="rv-meta" style={{ display: 'block' }}>{relativeDay(eat.at)}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
 function GroupForm({ group, kakis, onGroups, onDone }) {
   const [name, setName] = useState(group?.name ?? '')
   const [memberIds, setMemberIds] = useState(group?.members.map((m) => m.id) ?? [])
@@ -352,7 +406,7 @@ function FirstSteps({ me, data, onKakis, onOpenMe }) {
 }
 
 // The people you eat with: your @ to share, requests, your kakis and saved groups.
-export default function Kakis({ onEatTogether, onOpenMe }) {
+export default function Kakis({ onEatTogether, onOpenMe, onOpenReviewer }) {
   const { me } = useAuth()
   const [data, setData] = useState(null)
   const [groups, setGroups] = useState(null)
@@ -391,6 +445,7 @@ export default function Kakis({ onEatTogether, onOpenMe }) {
           <ShareHandle username={me.username} onOpenMe={onOpenMe} />
           <Requests incoming={data.incoming} onKakis={setData} />
           <Faces data={data} onKakis={setData} onRemoved={afterRemoval} />
+          <RecentEats onOpenReviewer={onOpenReviewer} />
           <Groups groups={groups} kakis={data.kakis} onGroups={setGroups} onEatTogether={onEatTogether} />
         </>
       )}

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { acceptSuggestion, dismissSuggestion, getProfile, getSuggestion } from '../api/engineApi.js'
+import TasteEditor from './TasteEditor.jsx'
 
-function RadarChart({ dimensions }) {
+// `compare`, same dimensions in the same order, is drawn dashed on top: someone else's taste next to yours.
+export function RadarChart({ dimensions, compare = null, label = 'Radar chart of your six taste dimensions' }) {
   const width = 360
   const height = 300
   const cx = width / 2
@@ -17,9 +19,7 @@ function RadarChart({ dimensions }) {
   const ringPath = (r) =>
     dimensions.map((_, i) => point(i, r).join(',')).join(' ')
 
-  const valuePath = dimensions
-    .map((d, i) => point(i, radius * d.value).join(','))
-    .join(' ')
+  const pathOf = (values) => values.map((d, i) => point(i, radius * d.value).join(',')).join(' ')
 
   return (
     <svg
@@ -27,7 +27,7 @@ function RadarChart({ dimensions }) {
       height={height}
       viewBox={`0 0 ${width} ${height}`}
       role="img"
-      aria-label="Radar chart of your six taste dimensions"
+      aria-label={label}
     >
       {[0.33, 0.66, 1].map((f) => (
         <polygon
@@ -45,7 +45,8 @@ function RadarChart({ dimensions }) {
           <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="#6b6257" strokeWidth="1" opacity="0.4" />
         )
       })}
-      <polygon points={valuePath} fill="#d6342c" fillOpacity="0.3" stroke="#d6342c" strokeWidth="2.5" />
+      <polygon points={pathOf(dimensions)} fill="#d6342c" fillOpacity="0.3" stroke="#d6342c" strokeWidth="2.5" />
+      {compare && <polygon points={pathOf(compare)} fill="none" stroke="#46689b" strokeWidth="2.5" strokeDasharray="5 4" />}
       {dimensions.map((d, i) => {
         const [x, y] = point(i, radius + 24)
         return (
@@ -238,7 +239,9 @@ function Lately({ trends, onAnswered }) {
   )
 }
 
-export default function TasteDna() {
+// Your Taste DNA. Admins can also Edit it: sliders that set the real taste by hand
+// (TasteEditor); `editing` is kept by App so the Demo controls can open it.
+export default function TasteDna({ canEdit = false, editing = false, onEditing = () => {}, onSaved = () => {} }) {
   const [profile, setProfile] = useState(null)
   const [error, setError] = useState(null)
 
@@ -246,6 +249,20 @@ export default function TasteDna() {
     getProfile().then(setProfile).catch((err) => setError(err.message))
   }, [])
 
+  if (canEdit && editing) {
+    return (
+      <main className="dna">
+        <h2>Set your taste</h2>
+        <TasteEditor
+          onCancel={() => onEditing(false)}
+          onSaved={() => {
+            onEditing(false)
+            onSaved()
+          }}
+        />
+      </main>
+    )
+  }
   if (error) return <div className="error">Profile unavailable: {error}</div>
   if (!profile) return <div className="loading">Reading your Taste DNA…</div>
 
@@ -253,7 +270,17 @@ export default function TasteDna() {
 
   return (
     <main className="dna">
-      <h2>Your Taste DNA</h2>
+      <div className="dna-head">
+        <h2>Your Taste DNA</h2>
+        {canEdit && (
+          <button type="button" className="btn quiet dna-edit" onClick={() => onEditing(true)}>
+            Edit
+          </button>
+        )}
+      </div>
+      {profile.setByHand && (
+        <p className="dna-by-hand">Set by hand: Find uses these values until your next review teaches it again.</p>
+      )}
       {profile.accuracy.count === 0 && (
         <p className="recent-note">
           You're starting neutral: the AI knows nothing about you yet. Rank a few dishes in Review and watch this move.

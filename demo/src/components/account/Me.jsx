@@ -3,7 +3,7 @@ import { useAuth } from '../../auth/AuthContext.jsx'
 import AdminPanel from '../admin/AdminPanel.jsx'
 import MyVenues from '../owner/MyVenues.jsx'
 import DeleteAccount from './DeleteAccount.jsx'
-import Profile from './Profile.jsx'
+import Profile, { MeSection } from './Profile.jsx'
 import RoleSwitcher from './RoleSwitcher.jsx'
 import './account.css'
 
@@ -22,7 +22,7 @@ function MeRow({ title, detail, onClick }) {
 // Your profile, and the doors to owner and admin tools, so the tab bar is the
 // same five tabs for everyone. "View as" lives here too, for admins.
 export default function Me({ onResetTaste }) {
-  const { role, logout } = useAuth()
+  const { me, role, logout } = useAuth()
   const [view, setView] = useState('me') // me | venues | admin
   const runsVenues = role === 'OWNER' || role === 'ADMIN'
   const isAdmin = role === 'ADMIN'
@@ -49,23 +49,29 @@ export default function Me({ onResetTaste }) {
   }
 
   return (
-    <Profile>
-      {(runsVenues || isAdmin) && (
-        <div className="me-rows">
-          {runsVenues && <MeRow title="My venues" detail="Status, hours, menu and prices" onClick={() => setView('venues')} />}
-          {isAdmin && <MeRow title="Admin" detail="Venue claims, people and roles" onClick={() => setView('admin')} />}
-        </div>
+    <Profile
+      venueTools={runsVenues && <MeRow title="Manage my venues" detail="Status, hours, menu and prices" onClick={() => setView('venues')} />}
+    >
+      {/* An admin viewing as someone else still needs View as, to come back. */}
+      {me.admin && (
+        <MeSection label="Admin">
+          {isAdmin && <MeRow title="Admin tools" detail="Venue claims, people and roles" onClick={() => setView('admin')} />}
+          <div className="me-group-row">
+            <RoleSwitcher />
+          </div>
+        </MeSection>
       )}
-      <RoleSwitcher />
-      <div className="row-actions">
-        <button type="button" className="btn quiet" onClick={onResetTaste} title="Forget what you've taught the AI">
-          Reset my taste
-        </button>
-        <button type="button" className="btn quiet" onClick={logout}>
-          Log out
-        </button>
+      <div className="me-footer">
+        <div className="row-actions">
+          <button type="button" className="btn quiet" onClick={onResetTaste} title="Forget what you've taught the AI">
+            Reset my taste
+          </button>
+          <button type="button" className="btn quiet" onClick={logout}>
+            Log out
+          </button>
+        </div>
+        <DeleteAccount />
       </div>
-      <DeleteAccount />
     </Profile>
   )
 }

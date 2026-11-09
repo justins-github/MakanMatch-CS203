@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { getChangeExplanation } from '../api/engineApi.js'
 import EmbeddedMap from './EmbeddedMap.jsx'
 import Avatar from './kakis/Avatar.jsx'
+import { CardBomb, useReviewBomb } from './ReviewBomb.jsx'
+import VenueReviews from './reviews/VenueReviews.jsx'
 
 const CONFIDENCE_DOTS = { high: 3, medium: 2, low: 1 }
 const CONFIDENCE_TEXT = {
@@ -97,6 +99,35 @@ function SinceLastVisit({ venueId, changes }) {
   )
 }
 
+// When other people's recent reviews moved your match: the numbers, why, and who said so.
+function ReviewChange({ change, onOpenReviewer }) {
+  const rose = change.now > change.was
+  return (
+    <div className="since-visit">
+      <div className="since-visit-label">{change.label}</div>
+      <div className={`since-visit-match ${rose ? 'up' : 'down'}`}>
+        {rose ? '▲' : '▼'} Match was {change.was}%, now {change.now}%
+      </div>
+      <div className="since-visit-why">{change.text}</div>
+      {change.reviewers.length > 0 && (
+        <div className="rv-faces">
+          {change.reviewers.map((person) => (
+            <button
+              key={person.id}
+              type="button"
+              className="rv-face"
+              aria-label={`See ${person.displayName}'s profile`}
+              onClick={() => onOpenReviewer(person.id)}
+            >
+              <Avatar id={person.id} name={person.displayName} small />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // On a group card: how well the place suits each person. The first is always you.
 function GroupScores({ scores }) {
   return (
@@ -115,8 +146,15 @@ const directionsUrl = (v) => `https://www.google.com/maps/dir/?api=1&destination
 
 // Tapping a card opens it in place: a map, then "Write a review" and "Directions".
 // The name is a real button so the keyboard can open it too.
-export default function VenueCard({ venue, index, open, onToggle, onReview }) {
+const MOVE_WORDS = {
+  new: () => 'new in your top 10',
+  up: (m) => `▲ up ${m.places} place${m.places === 1 ? '' : 's'}`,
+  down: (m) => `▼ down ${m.places} place${m.places === 1 ? '' : 's'}`,
+}
+
+export default function VenueCard({ venue, index, open, onToggle, onReview, onOpenReviewer, move = null }) {
   const dots = CONFIDENCE_DOTS[venue.confidence]
+  const reviewBomb = useReviewBomb()
 
   // Construct a fallback address string for the map popup
   const fullAddress = [venue.area, venue.address ?? venue.postcode].filter(Boolean).join(' · ')
@@ -144,6 +182,7 @@ export default function VenueCard({ venue, index, open, onToggle, onReview }) {
       <div className="meta">
         {fullAddress}
       </div>
+      {move && <span className={`card-move ${move.kind}`}>{MOVE_WORDS[move.kind](move)}</span>}
       {venue.hours ? (
         <div className="hours-line">{venue.hours.label}</div>
       ) : (
@@ -153,6 +192,7 @@ export default function VenueCard({ venue, index, open, onToggle, onReview }) {
       {!venue.sinceLastVisit?.updates.some((u) => u.reportedAt === venue.ownerUpdate?.reportedAt) && (
         <OwnerUpdate update={venue.ownerUpdate} />
       )}
+      {venue.reviewChange && <ReviewChange change={venue.reviewChange} onOpenReviewer={onOpenReviewer} />}
       {venue.sinceLastVisit && <SinceLastVisit venueId={venue.id} changes={venue.sinceLastVisit} />}
       {venue.groupScores && <GroupScores scores={venue.groupScores} />}
       <div className="chips">
@@ -170,7 +210,7 @@ export default function VenueCard({ venue, index, open, onToggle, onReview }) {
           <span key={n} className={`dot${n <= dots ? ` on-${venue.confidence}` : ''}`} />
         ))}
         {CONFIDENCE_TEXT[venue.confidence]}
-        <span className="card-more" aria-hidden="true">{open ? 'Close ▴' : 'Map · review ▾'}</span>
+        <span className="card-more" aria-hidden="true">{open ? 'Close ▴' : 'Map · reviews ▾'}</span>
       </div>
       <div
         className="sticker"
@@ -190,6 +230,8 @@ export default function VenueCard({ venue, index, open, onToggle, onReview }) {
             height={180}
             directions={false}
           />
+          {/* Reloads after an admin's review bomb lands or is taken back. */}
+          <VenueReviews key={reviewBomb?.version ?? 0} venueId={venue.id} onOpenReviewer={onOpenReviewer} />
           <div className="card-actions">
             <button type="button" className="btn" onClick={() => onReview(venue)}>
               ✎ Write a review
@@ -198,6 +240,7 @@ export default function VenueCard({ venue, index, open, onToggle, onReview }) {
               Directions ↗
             </a>
           </div>
+          <CardBomb venue={venue} />
         </div>
       )}
     </article>

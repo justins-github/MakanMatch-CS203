@@ -129,4 +129,131 @@ for (const [kind, makeStore] of Object.entries(stores)) {
     assert.deepEqual(await store.history(ALICE), [])
     assert.equal((await store.read(BOB, 'Bob')).reviews.length > 0, true)
   })
+
+  // Reading other people's reviews.
+  const fresh = async () => {
+    const store = makeStore()
+    await store.reset(ALICE)
+    await store.reset(BOB)
+    return store
+  }
+  const postedAt = (store, userId, dishId, day, { venueId = VENUE.id, sentiment = 'disliked', noSentiment = false } = {}) =>
+    store.update(userId, 'Tester', async (state) => {
+      const result = applyBeliReview(state, dish(dishId, { venueId }), VENUE, { sentiment, insertIndex: 0, text: `about ${dishId}` })
+      result.review.at = `2026-11-0${day}T12:00:00.000Z`
+      if (noSentiment) delete result.review.sentiment
+      return { result, review: result.review, tasteVector: null }
+    })
+  const undoLatest = (store, userId) =>
+    store.update(userId, 'Tester', async (state) => {
+      const latest = state.reviews.at(-1)
+      return { result: undoLatestReview(state, { dishId: latest.dishId, at: latest.at }), undone: true }
+    })
+  const dishes = (rows) => rows.map((r) => r.dishId)
+
+  test(`${kind}: recent reviews at chosen venues name their writer, newest first`, async () => {
+    const store = await fresh()
+    await postedAt(store, ALICE, 'a', 3)
+    await postedAt(store, BOB, 'b', 4)
+    await postedAt(store, BOB, 'elsewhere', 5, { venueId: 'other-place' })
+    const rows = await store.recentReviewsAt([VENUE.id], '2026-11-01T00:00:00.000Z')
+    assert.deepEqual(dishes(rows), ['b', 'a'])
+    assert.deepEqual(rows.map((r) => r.userId), [BOB, ALICE])
+    assert.equal(rows[0].venueId, VENUE.id)
+    assert.equal(rows[0].sentiment, 'disliked')
+    assert.equal(rows[0].text, 'about b')
+    assert.equal(rows[0].at, '2026-11-04T12:00:00.000Z')
+  })
+
+  test(`${kind}: no venue list means every venue`, async () => {
+    const store = await fresh()
+    await postedAt(store, ALICE, 'a', 3)
+    await postedAt(store, BOB, 'elsewhere', 4, { venueId: 'other-place' })
+    assert.deepEqual(dishes(await store.recentReviewsAt(null, '2026-11-01T00:00:00.000Z')), ['elsewhere', 'a'])
+  })
+
+  test(`${kind}: reviews from before the window are left out`, async () => {
+    const store = await fresh()
+    await postedAt(store, ALICE, 'old', 2)
+    await postedAt(store, ALICE, 'new', 4)
+    assert.deepEqual(dishes(await store.recentReviewsAt([VENUE.id], '2026-11-03T00:00:00.000Z')), ['new'])
+  })
+
+  test(`${kind}: other people's reviews never carry the writer's past profile`, async () => {
+    const store = await fresh()
+    await postedAt(store, ALICE, 'a', 3)
+    const rows = [
+      ...(await store.recentReviewsAt([VENUE.id], '2026-11-01T00:00:00.000Z')),
+      ...(await store.reviewsAtVenue(VENUE.id, 5)),
+      ...(await store.reviewsByPeople([ALICE], { limit: 5 })),
+    ]
+    assert.equal(rows.length, 3)
+    assert.ok(rows.every((r) => !('profileBefore' in r)))
+  })
+
+  test(`${kind}: an undone review disappears from every read and from the count`, async () => {
+    const store = await fresh()
+    await postedAt(store, ALICE, 'kept', 3)
+    await postedAt(store, ALICE, 'taken-back', 4)
+    await undoLatest(store, ALICE)
+    assert.deepEqual(dishes(await store.recentReviewsAt([VENUE.id], '2026-11-01T00:00:00.000Z')), ['kept'])
+    assert.deepEqual(dishes(await store.reviewsAtVenue(VENUE.id, 5)), ['kept'])
+    assert.deepEqual(dishes(await store.reviewsByPeople([ALICE], { limit: 5 })), ['kept'])
+    assert.equal((await store.peopleFacts([ALICE])).get(ALICE).reviewCount, 1)
+  })
+
+  test(`${kind}: a review with no verdict is left out`, async () => {
+    const store = await fresh()
+    await postedAt(store, ALICE, 'star-only', 3, { noSentiment: true })
+    assert.deepEqual(await store.recentReviewsAt([VENUE.id], '2026-11-01T00:00:00.000Z'), [])
+    assert.deepEqual(await store.reviewsAtVenue(VENUE.id, 5), [])
+    assert.deepEqual(await store.reviewsByPeople([ALICE], { limit: 5 }), [])
+  })
+
+  test(`${kind}: reviews at one venue come newest first, up to the limit`, async () => {
+    const store = await fresh()
+    await postedAt(store, ALICE, 'a', 3)
+    await postedAt(store, BOB, 'b', 5)
+    await postedAt(store, BOB, 'c', 4)
+    await postedAt(store, BOB, 'elsewhere', 6, { venueId: 'other-place' })
+    assert.deepEqual(dishes(await store.reviewsAtVenue(VENUE.id, 2)), ['b', 'c'])
+  })
+
+  test(`${kind}: reviews by chosen people come newest first, up to the limit and window`, async () => {
+    const store = await fresh()
+    await postedAt(store, ALICE, 'a', 3)
+    await postedAt(store, BOB, 'b', 5)
+    await postedAt(store, BOB, 'c', 4, { venueId: 'other-place' })
+    assert.deepEqual(dishes(await store.reviewsByPeople([ALICE, BOB], { limit: 2 })), ['b', 'c'])
+    assert.deepEqual(dishes(await store.reviewsByPeople([ALICE], { limit: 5 })), ['a'])
+    assert.deepEqual(dishes(await store.reviewsByPeople([ALICE, BOB], { limit: 5, since: '2026-11-04T00:00:00.000Z' })), ['b', 'c'])
+  })
+
+  test(`${kind}: facts about people give their profile and review count`, async () => {
+    const store = await fresh()
+    await postedAt(store, ALICE, 'a', 3)
+    await postedAt(store, ALICE, 'b', 4)
+    const facts = await store.peopleFacts([ALICE, BOB])
+    assert.equal(facts.get(ALICE).reviewCount, 2)
+    assert.equal(facts.get(ALICE).profile.spicePref, (await store.read(ALICE, 'Alice')).profile.spicePref)
+    assert.equal(facts.has(BOB), false, 'no stored profile, no entry')
+  })
+
+  test(`${kind}: after a reset, a person is gone from every read`, async () => {
+    const store = await fresh()
+    await postedAt(store, ALICE, 'a', 3)
+    await store.reset(ALICE)
+    assert.deepEqual(await store.recentReviewsAt([VENUE.id], '2026-11-01T00:00:00.000Z'), [])
+    assert.deepEqual(await store.reviewsAtVenue(VENUE.id, 5), [])
+    assert.deepEqual(await store.reviewsByPeople([ALICE], { limit: 5 }), [])
+    assert.equal((await store.peopleFacts([ALICE])).size, 0)
+  })
+
+  test(`${kind}: asking about nobody finds nothing`, async () => {
+    const store = await fresh()
+    await postedAt(store, ALICE, 'a', 3)
+    assert.deepEqual(await store.recentReviewsAt([], '2026-11-01T00:00:00.000Z'), [])
+    assert.deepEqual(await store.reviewsByPeople([], { limit: 5 }), [])
+    assert.equal((await store.peopleFacts([])).size, 0)
+  })
 }

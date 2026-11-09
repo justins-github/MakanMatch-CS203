@@ -120,9 +120,9 @@ export function createReviewReader({ ai }) {
   return {
     async read({ text, dish, venue, sentiment, profile }) {
       if (!text?.trim()) return { readBy: null, blame: 'overall', signals: [] }
-      if (!ai?.available) return keywordReading(text)
+      if (!ai?.available) return keywordReading(text, sentiment)
       const answer = await ai.json({ system: SYSTEM, prompt: promptFor({ text, dish, venue, sentiment, profile }), schema: SCHEMA, maxTokens: 2048 })
-      if (!answer || !Array.isArray(answer.signals)) return keywordReading(text)
+      if (!answer || !Array.isArray(answer.signals)) return keywordReading(text, sentiment)
       const signals = keepValid(answer.signals, text, venue)
       return { readBy: 'ai', blame: answer.blame === 'specific' && signals.length ? 'specific' : 'overall', signals }
     },

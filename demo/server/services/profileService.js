@@ -1,13 +1,14 @@
 // The Taste DNA view: the six dimensions the AI has learned for one user, which
 // of them have been moving steadily lately (trends.js), and "Claude's take" on
 // those trends with an offer to lean into them (suggestion.js, tasteSummary.js).
-import { badRequest, conflict } from '../errors.js'
-import { getAccuracy } from '../learn.js'
+import { badRequest, conflict, forbidden } from '../errors.js'
+import { getAccuracy, starterProfile } from '../learn.js'
 import { applySuggestion, suggestionFor } from '../suggestion.js'
+import { applyDials, dialsOf, venuesPerCuisine } from '../tasteDials.js'
 import { createSummaryWriter } from '../tasteSummary.js'
 import { findTrends } from '../trends.js'
 
-function dimensionsFor(profile) {
+export function dimensionsFor(profile) {
   const affinities = Object.values(profile.cuisineAffinity)
   const breadth = affinities.length ? affinities.reduce((a, b) => a + b, 0) / affinities.length : 0
   return [
@@ -20,9 +21,19 @@ function dimensionsFor(profile) {
   ]
 }
 
-const currentSuggestion = (state) => suggestionFor(findTrends(state.reviews, state.profile), state.decisions ?? [])
+// A taste set by hand (Taste DNA sliders) jumped in one step, so it isn't a trend: none
+// until a review hands the taste back to learning.
+const trendsOf = (state) => (state.profile.setByHand ? [] : findTrends(state.reviews, state.profile))
+const currentSuggestion = (state) => suggestionFor(trendsOf(state), state.decisions ?? [])
 
-export function createProfileService({ learners, summaries = createSummaryWriter({ ai: null }) }) {
+// Setting your taste by hand is for admins, and not while viewing as someone else.
+function assertAdmin(user) {
+  if (user.me.effectiveRole !== 'ADMIN') throw forbidden('Setting your taste by hand is for admins')
+}
+
+export function createProfileService({ learners, summaries = createSummaryWriter({ ai: null }), registry = { venues: [] } }) {
+  let venueCounts = null
+  const countsOf = () => (venueCounts ??= venuesPerCuisine(registry.venues))
   // `${userId}|${signature}` -> Promise<{ summary, writtenBy }>: one Claude call per
   // suggestion, shared by visits that overlap. Only the user's current suggestion is
   // kept, and a template (Claude didn't answer) isn't, so the next visit tries again.
@@ -58,15 +69,17 @@ export function createProfileService({ learners, summaries = createSummaryWriter
         learners.read(user.id, user.me.displayName),
         learners.history(user.id),
       ])
-      const profile = { ...state.profile, name: user.me.displayName }
+      const { setByHand, ...learned } = state.profile
+      const profile = { ...learned, name: user.me.displayName }
       return {
         user: profile,
+        setByHand: Boolean(setByHand),
         dimensions: dimensionsFor(profile),
         history: history.map(({ profile: snapshot, recordedAt }) => ({
           recordedAt: new Date(recordedAt).toISOString(),
           dimensions: dimensionsFor(snapshot),
         })),
-        trends: findTrends(state.reviews, state.profile),
+        trends: trendsOf(state),
         accuracy: getAccuracy(state),
       }
     },
@@ -81,5 +94,27 @@ export function createProfileService({ learners, summaries = createSummaryWriter
 
     acceptSuggestion: (user, body) => decide(user, body, 'accepted'),
     dismissSuggestion: (user, body) => decide(user, body, 'dismissed'),
+
+    // The sliders: your taste now, and `starter` - a brand-new account's - for the
+    // editor's "Reset to a new account".
+    async dials(user) {
+      assertAdmin(user)
+      const { profile } = await learners.read(user.id, user.me.displayName)
+      const { setByHand, ...starter } = dialsOf(starterProfile(user.me.displayName), countsOf())
+      return { ...dialsOf(profile, countsOf()), starter }
+    },
+
+    // Saves the sliders into your real taste: { dials: { spicePref, richnessPref,
+    // priceComfort, adventurousness, cuisineAffinity } }, any of them. It's marked set by
+    // hand, so Find takes the embedding from the sliders until your next review.
+    async tune(user, body) {
+      assertAdmin(user)
+      const { dials } = body ?? {}
+      if (dials == null) throw badRequest('Send the sliders to save')
+      return learners.update(user.id, user.me.displayName, async (state) => {
+        state.profile = { ...applyDials(state.profile, dials), setByHand: true }
+        return { result: dialsOf(state.profile, countsOf()) }
+      })
+    },
   }
 }

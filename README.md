@@ -47,6 +47,11 @@ avatar, and the logo appears on a splash screen while your session loads.
 - **Surprise me**: one pick from a cuisine your Taste DNA hasn't explored yet.
 - **Live context**: when data.gov.sg forecasts rain where you are, the feed re-ranks towards
   sheltered venues. Venues closed right now drop out, with the reason shown.
+- **Other people's reviews**: reviews from people with a taste like yours move your
+  matches. If most of them found a place too spicy and you keep the spice low, it
+  drops for you and its card says why; places pushed out of your top 10 are listed
+  below it. Open **Map · reviews** on a card to read its reviews, tap a name to
+  compare that person's taste with yours, and see your kakis' recent eats on **Kakis**.
 - **Dietary dealbreakers**: if you eat halal, you only see venues our data tags
   halal. If you're vegetarian or vegan, meat-only places (steakhouses, BBQ, chicken
   rice...) drop out and vegetarian places get a small boost.
@@ -59,8 +64,11 @@ avatar, and the logo appears on a splash screen while your session loads.
   against dishes you've already ranked, and can add a written review.
 - **Taste DNA**: the learned profile, with six taste dimensions, per-cuisine
   affinities and a model-accuracy meter that climbs as its predictions improve.
-- **Me**: display name, username, password and dietary needs (restrictions,
-  preferences and spice level), plus Reset my taste and Log out.
+- **Makan Pet**: an otter on For you that grows with a review a day and faints if
+  you miss one. Minimise it to a small pill if it's in the way.
+- **Me**: your details (display name, username and dietary needs: restrictions,
+  preferences and spice level), password and the venues you run, plus Reset my
+  taste and Log out.
 
 ### For venue owners
 
@@ -76,13 +84,23 @@ Owners then get **My venues** in the Me tab, where they can:
 
 ### For admins
 
-Admins get **Admin** and **View as** in the Me tab, and a Simulate rain button
-next to the weather.
+Admins get **Admin tools** and **View as** in the Me tab, and a **Demo** button in
+the top bar.
 
 - approve or reject venue claims, and revoke ownership;
 - promote and demote admins, and disable accounts;
 - use **View as** to see the app as a diner or an owner. The server applies that
-  role's permissions for real, so it is a genuine test.
+  role's permissions for real, so it is a genuine test;
+- open **Demo** to show the app reacting: simulate rain, take back a review bomb,
+  and move Makan Pet's day forward. The button says how many are switched on, so
+  nothing is left on after a rehearsal;
+- drop a **review bomb** on any place with a menu from its card (**Review-bomb this
+  place**): three seeded spice-shy accounts post real "too spicy" reviews, and the
+  place drops for diners with a taste like theirs. One place at a time; set up once
+  with `seed:personas` and `seed:review-bomb -- --prepare`;
+- set their own taste by hand on **Taste DNA → Edit**: sliders, set all cuisines to
+  0, or reset to a new account. It's their real taste, and until their next review
+  Find builds its taste embedding from the sliders.
 
 "Owner" isn't a stored role: an account is an owner when it manages at least one
 venue. Owners can't review their own venues. An admin's own claim is approved at once,
@@ -146,9 +164,10 @@ The code follows three rules:
 The engine scores every venue for the signed-in diner:
 
 ```
-score = 50 + cuisine affinity
-           + spice, richness and price fit   (only where the venue's data is known)
+score = 50 + cuisine affinity − avoided-cuisine drag
+           + spice, richness and price fit   (where known, or where reviews say)
            + taste-vector similarity
+           ± what reviews from people like you say
            − distance − recent-cuisine fatigue ± context (rain, mood)
 ```
 
@@ -168,6 +187,14 @@ sentence embedding (all-MiniLM-L6-v2, built offline, so the server runs no model
 at request time). The engine compares it with the average embedding of venues you
 rated above 5/10. [`demo/README.md`](demo/README.md) has the full formula and
 walks through each screen.
+
+**Other people's reviews.** Reviews from the last 30 days count for you by how close
+the reviewer's taste is to yours (spice, richness, price, adventure and cuisines),
+how recent they are and how much the reviewer has reviewed. Together they shift
+what the app believes about a venue's spice and richness, by at most 0.7 of the
+scale and less while the evidence is thin, and nudge the score by up to 12 points.
+When that moves a card by 3 or more, the card says so and names who. A cuisine at
+or near 0 drags its places down by up to 30 points ("You avoid turkish").
 
 **Eating with kakis.** Each person at the table scores every venue with their own
 Taste DNA, and a venue's group score is the average. Nobody should be stuck
@@ -189,6 +216,14 @@ the diner's kaki before the engine sees their Taste DNA.
   Supabase's published keys, plus expiry, issuer and audience. Roles come from
   our database, not the token, so promoting, demoting or disabling an account
   takes effect within 30 seconds everywhere.
+- **Reviews are visible to every signed-in user**: a place's reviews, and a
+  reviewer's recent reviews and five taste dimensions on their profile. Nothing else
+  leaves the engine (not the before-snapshot kept for undo, dietary needs or emails);
+  account-service's `GET /api/people` returns only id, display name and username,
+  and leaves out disabled accounts.
+- **The review bomb signs in as the three demo accounts** with
+  `SEED_PERSONA_PASSWORD` from `.env`, and as no one else. Leave it unset outside
+  a demo.
 - **Guard rails:** login throttling, one generic message for failed logins,
   venue claims need an admin (an admin's own claim goes through at once), and the
   last active admin can't be removed.
@@ -297,7 +332,7 @@ Sign up in the app, then run:
 node scripts/seed-accounts.mjs --promote you@example.com
 ```
 
-Refresh, and **Admin** appears in the Me tab. From then on, admins promote each
+Refresh, and **Admin tools** appears in the Me tab. From then on, admins promote each
 other in the app.
 
 ### Optional: the demo community
@@ -312,8 +347,11 @@ npm run seed:personas
 npm run simulate
 ```
 
-The first command creates four diners with distinct tastes, two owners and a
-pending claim. The second plays a week of activity through the real APIs:
+The first command creates the demo community: four diners with distinct tastes,
+four spice-shy accounts for the review bomb (Sam, Wei Ling, Hafiz and Nadia), two
+owners and a pending claim. For the review bomb, also run
+`npm run seed:review-bomb -- --prepare` once; an admin then drops it from a place's
+card. The second plays a week of activity through the real APIs:
 reviews, an owner reporting that their venue moved, a temporary closure and a
 disputed price. Personas sign in with their username (for example `mei_chilli`).
 Run `npm run simulate -- --fresh` to reset the diners first.
@@ -372,6 +410,8 @@ cd context-service && ./mvnw test
 | `npm run upload:vectors` | Upload venue embeddings to pgvector |
 | `npm run seed:personas` / `npm run simulate` | Create the demo community and play a week of activity |
 | `npm run seed:changes` | Mei reviews Turk's Kebab, then its owner changes prices and the menu, so her card shows "Since your last visit" (run after `seed:personas`) |
+| `npm run seed:review-bomb -- --prepare` | Give the spice-shy demo accounts their review history, and make Sam kakis with Hafiz and Mei (run after `seed:personas`) |
+| `npm run seed:review-bomb` | The review bomb from the command line (admins can also drop it from a place's card): three spice-shy accounts review Turk's Kebab as "SUPER SPICY". Safe to re-run, one place at a time. `--undo` takes it back wherever it was dropped, `--check` shows where the place stands for Sam, `--venue <id>` picks another place |
 | `node scripts/extract-overture.mjs` | Re-extract Singapore venues from the latest monthly Overture Maps release, then run `load:venues` |
 | `node scripts/embed-venues.mjs` | Rebuild the venue embeddings |
 | `node scripts/seed-accounts.mjs --promote <email>` | Make an account an admin |
@@ -409,6 +449,8 @@ Everything under [What it does](#what-it-does) works end to end. Still to come:
   team's own addresses, so an admin resets passwords from the Supabase dashboard.
 - **Login throttling is kept in memory**, so each instance counts on its own and
   the counts reset on restart.
+- **A disabled account's reviews keep counting** in other people's matches until
+  they fade (30 days), though they're hidden from every list straight away.
 
 ## Contributing
 

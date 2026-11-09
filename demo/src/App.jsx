@@ -8,6 +8,10 @@ import LocationPicker from './components/LocationPicker.jsx'
 import Login from './components/Login.jsx'
 import MakanPet, { useMakanPet } from './components/MakanPet.jsx'
 import Review from './components/Review.jsx'
+import ReviewerProfile from './components/reviews/ReviewerProfile.jsx'
+import DemoPanel from './components/DemoPanel.jsx'
+import { ReviewBombProvider } from './components/ReviewBomb.jsx'
+import { movesBetween } from './rankMoves.js'
 import Splash from './components/Splash.jsx'
 import TasteDna from './components/TasteDna.jsx'
 import Me from './components/account/Me.jsx'
@@ -63,11 +67,13 @@ export default function App() {
 
 function SignedInApp() {
   const { me, role } = useAuth()
-  const { pet, today, simulator, markReview, advanceDay, resetDaySimulator } = useMakanPet(me.id)
+  const { pet, today, simulator, minimized: petMinimized, toggleMinimized: togglePet, markReview, advanceDay, resetDaySimulator } = useMakanPet(me.id)
   const [tab, setTab] = useState('feed')
-  const [petMinimized, setPetMinimized] = useState(false)
+  const [editingTaste, setEditingTaste] = useState(false) // an admin's taste sliders, on Taste DNA
   const [reviewVenue, setReviewVenue] = useState(null) // set when a For you card starts a review
   const [reviewOpened, setReviewOpened] = useState(false) // the Review tab loads when first opened
+  const [reviewerId, setReviewerId] = useState(null) // whose profile is open, over the current tab
+  const [reviewerScroll, setReviewerScroll] = useState(0) // where to come back to
   if (tab === 'rate' && !reviewOpened) setReviewOpened(true)
   const [mode, setMode] = useState('idle') // idle | find | surprise
   const [company, setCompany] = useState('solo') // solo | friends
@@ -79,15 +85,18 @@ function SignedInApp() {
   const [exclude, setExclude] = useState([]) // surprise picks already shown
   const [error, setError] = useState(null)
   const [resetCount, setResetCount] = useState(0)
+  const [demoVersion, setDemoVersion] = useState(0) // bumped when an admin's demo tool changes things
+  const [rankBefore, setRankBefore] = useState(null) // the list's order before that change
   const [where, setWhere] = useState(loadWhere) // { lat, lon, label, source, walkMin }
 
-  // Rain simulation is an admin tool; viewing as a user or owner switches it off.
-  const canSimulateRain = role === 'ADMIN'
-  if (simRain && !canSimulateRain) setSimRain(false)
+  // The Demo controls (rain and the rest) are an admin tool; viewing as a user or owner switches rain off.
+  const canDemo = role === 'ADMIN'
+  if (simRain && !canDemo) setSimRain(false)
 
   const changeWhere = (next) => {
     setWhere(next)
     saveWhere(next)
+    setRankBefore(null) // a new spot is a new list, not the old one moved
   }
 
   // Before the fetches below, so they go out from the right spot.
@@ -129,15 +138,29 @@ function SignedInApp() {
       })
       .catch((err) => { if (!cancelled) setError(err.message) })
     return () => { cancelled = true }
-  }, [me.id, role, mode, mood, simRain, exclude, company, party, tab, resetCount, where.lat, where.lon, where.walkMin])
+  }, [me.id, role, mode, mood, simRain, exclude, company, party, tab, resetCount, where.lat, where.lon, where.walkMin, demoVersion])
 
   const startMode = (next) => {
     setRecs(null)
     setExclude([])
+    setRankBefore(null)
     setMode(next)
   }
 
+  // A Demo control changed what Find shows: back to For you and Find again, keeping the
+  // old order so the cards can say how they moved.
+  const afterDemoChange = () => {
+    setReviewerId(null)
+    setTab('feed')
+    if (mode === 'idle') return startMode('find')
+    setRankBefore(recs?.venues.map((v) => v.id) ?? null)
+    setDemoVersion((n) => n + 1)
+  }
+  // Only Find's list has places to move; Surprise is one pick at a time.
+  const moves = mode === 'find' && rankBefore && recs ? movesBetween(rankBefore, recs.venues) : null
+
   const backToLanding = () => {
+    setRankBefore(null)
     setMode('idle')
     setRecs(null)
     setExclude([])
@@ -184,25 +207,50 @@ function SignedInApp() {
     setResetCount((n) => n + 1) // re-fetches the feed and remounts the other tabs
   }
 
+  const openReviewer = (id) => {
+    setReviewerScroll(window.scrollY)
+    setReviewerId(id)
+    window.scrollTo(0, 0)
+  }
+  const closeReviewer = () => {
+    setReviewerId(null)
+    requestAnimationFrame(() => window.scrollTo(0, reviewerScroll))
+  }
+
   // Remount tab content when the role changes, so it reloads with the new permissions.
   const viewKey = `${role}-${resetCount}`
 
   return (
+    <ReviewBombProvider enabled={canDemo} onChanged={afterDemoChange}>
     <div className="phone with-nav fade-in">
       <TopBar
         me={me}
         onOpenMe={() => setTab('me')}
-        weather={
-          <ContextBanner
-            context={context}
+        weather={<ContextBanner context={context} />}
+        demo={canDemo && (
+          <DemoPanel
+            key={viewKey}
             simRain={simRain}
-            canSimulate={canSimulateRain}
             onToggleRain={() => setSimRain((v) => !v)}
+            today={today}
+            simulator={simulator}
+            onNextDay={advanceDay}
+            onResetPet={resetDaySimulator}
+            onFindAgain={afterDemoChange}
+            onEditTaste={() => {
+              setReviewerId(null)
+              setEditingTaste(true)
+              setTab('dna')
+            }}
           />
-        }
+        )}
       />
       <ActingAsTape />
 
+      {reviewerId && <ReviewerProfile key={reviewerId} id={reviewerId} onBack={closeReviewer} />}
+
+      {/* Stays mounted under a profile, so Back returns to the same open card. */}
+      <div className="tab-keep" hidden={reviewerId != null}>
       {tab === 'feed' && (
         <>
           <CompanySwitch
@@ -213,16 +261,7 @@ function SignedInApp() {
             }}
           />
           <LocationPicker where={where} area={context?.area} onChange={changeWhere} />
-          <MakanPet
-            pet={pet}
-            today={today}
-            simulator={simulator}
-            minimized={petMinimized}
-            onToggleMinimized={() => setPetMinimized((value) => !value)}
-            onCare={startPetReview}
-            onNextDay={advanceDay}
-            onResetSimulator={resetDaySimulator}
-          />
+          <MakanPet pet={pet} today={today} minimized={petMinimized} onToggleMinimized={togglePet} onCare={startPetReview} />
           {error ? (
             <main className="feed">
               <button className="back-link" onClick={backToLanding}>
@@ -251,23 +290,15 @@ function SignedInApp() {
                 setReviewVenue(venue)
                 setTab('rate')
               }}
+              onOpenReviewer={openReviewer}
+              moves={moves}
             />
           )}
         </>
       )}
 
-      {tab === 'kakis' && <Kakis key={viewKey} onEatTogether={eatTogether} onOpenMe={() => setTab('me')} />}
-      {tab === 'rate' && (
-        <MakanPet
-          pet={pet}
-          today={today}
-          simulator={simulator}
-          minimized={petMinimized}
-          onToggleMinimized={() => setPetMinimized((value) => !value)}
-          onNextDay={advanceDay}
-          onResetSimulator={resetDaySimulator}
-        />
-      )}
+      {tab === 'kakis' && <Kakis key={viewKey} onEatTogether={eatTogether} onOpenMe={() => setTab('me')} onOpenReviewer={openReviewer} />}
+      {tab === 'rate' && <MakanPet pet={pet} today={today} minimized={petMinimized} onToggleMinimized={togglePet} />}
       {/* Stays mounted once opened, so an unfinished review survives a look at another tab. */}
       {reviewOpened && (
         <div className="tab-keep" hidden={tab !== 'rate'}>
@@ -279,16 +310,28 @@ function SignedInApp() {
           />
         </div>
       )}
-      {tab === 'dna' && <TasteDna key={viewKey} />}
+      {tab === 'dna' && (
+        <TasteDna
+          key={viewKey}
+          canEdit={canDemo}
+          editing={editingTaste}
+          onEditing={setEditingTaste}
+          onSaved={afterDemoChange}
+        />
+      )}
       {tab === 'me' && <Me key={viewKey} onResetTaste={resetTaste} />}
+      </div>
 
       <BottomNav
         active={tab}
         onSelect={(next) => {
           setReviewVenue(null)
+          setReviewerId(null)
+          setEditingTaste(false)
           setTab(next)
         }}
       />
     </div>
+    </ReviewBombProvider>
   )
 }

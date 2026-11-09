@@ -350,6 +350,8 @@ export default function Review({ active = true, startVenue = null, onReviewSaved
   // Same-named chain outlets get their location appended.
   const nameCounts = results.reduce((m, r) => m.set(r.name, (m.get(r.name) ?? 0) + 1), new Map())
   const opponent = step === 'duel' ? currentOpponent(duel) : null
+  // A place with nothing on its menu yet goes straight to adding the dish you had.
+  const noDishes = venueDishes?.length === 0
 
   return (
     <main className="rate">
@@ -418,7 +420,7 @@ export default function Review({ active = true, startVenue = null, onReviewSaved
       {step === 'dish' && (
         <>
           <button className="back-link" onClick={() => setStep('search')}>
-            ← Search
+            ← Choose another place
           </button>
           <h2 className="step-title">{venue.name}</h2>
           {venueInfo?.youManage ? (
@@ -430,7 +432,9 @@ export default function Review({ active = true, startVenue = null, onReviewSaved
           {venueInfo?.degraded && (
             <div className="rerank-note">The menu service is down, so this is our starter menu for the venue.</div>
           )}
-          <div className="rate-intro">Which dish did you have?</div>
+          <div className="rate-intro">
+            {noDishes ? 'No dishes on record here yet. Add the one you had, then review it.' : 'Which dish did you have?'}
+          </div>
           {!venueDishes && <div className="loading">Loading the menu…</div>}
           <div className="venue-list">
             {(venueDishes ?? []).map((d) => (
@@ -452,7 +456,7 @@ export default function Review({ active = true, startVenue = null, onReviewSaved
               </button>
             ))}
           </div>
-          {adding ? (
+          {adding || noDishes ? (
             <div className="add-dish">
               <input
                 className="search-input"
@@ -539,7 +543,7 @@ export default function Review({ active = true, startVenue = null, onReviewSaved
           </button>
           <h2 className="step-title">Say more about {dish.name}</h2>
           <div className="rate-intro">
-            The AI reads this - themes repeated across your reviews compound in your Taste DNA.
+            The AI reads this, and so can anyone on MakanMatch - themes repeated across your reviews compound in your Taste DNA.
           </div>
           <textarea
             className="review-text"

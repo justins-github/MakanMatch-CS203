@@ -17,6 +17,16 @@ export const SIGNALS = [
     re: /(too|way too|overly)[^.!?\n]{0,12}(spicy|hot)|can'?t (handle|take)[^.!?\n]{0,20}(spice|heat)/i,
   },
   {
+    id: 'spice-intense',
+    label: 'it being too spicy',
+    dim: 'spice',
+    dir: -1,
+    // Not after "not"/"n't": "not very spicy" says it was milder.
+    re: /(?<!(?:\bnot|n't)\s)\b(super|very|so|crazy|insanely|extremely)\s+(spicy|hot)\b/i,
+    // "Super spicy" alone doesn't say whether that was good: the verdict decides.
+    onlyIf: (sentiment) => sentiment === 'fine' || sentiment === 'disliked',
+  },
+  {
     id: 'too-rich',
     label: 'it being oily or heavy',
     dim: 'richness',
@@ -57,9 +67,9 @@ const DIMENSION = { spice: 'spice', richness: 'richness', price: 'price', advent
 
 // One review text read by the lexicon, in the reader's shape (see reviewReader.js).
 // It can't tell why you felt something, so blame is always "overall".
-export function keywordReading(text) {
+export function keywordReading(text, sentiment = null) {
   if (!text?.trim()) return { readBy: null, blame: 'overall', signals: [] }
-  const signals = SIGNALS.filter((s) => s.re.test(text)).map((s) => ({
+  const signals = SIGNALS.filter((s) => s.re.test(text) && (!s.onlyIf || s.onlyIf(sentiment))).map((s) => ({
     dimension: DIMENSION[s.dim],
     direction: s.dir > 0 ? 'up' : 'down',
     strength: 2,

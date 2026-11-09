@@ -44,9 +44,26 @@ a real sign-in screen. `npm test` runs the engine tests (`node --test`).
   cuisine + distance, community-enriched ones add spice/heartiness/price/shelter,
   and an information cap keeps a barebones venue from claiming a 99% match. The
   weather chip in the top bar shows the *live* two-hour forecast from data.gov.sg for the forecast area nearest you; when it rains (or an
-  admin presses **Simulate rain**), venues *known* to be sheltered get boosted and the
+  admin simulates it from **Demo**), venues *known* to be sheltered get boosted and the
   chips explain the re-rank. Halal and vegetarian needs from your profile are
   dealbreakers (`server/dietary.js`).
+- **Other people's reviews** - recent reviews (30 days, fading) from people whose taste
+  is close to yours shift what the app believes about a venue's spice and richness for
+  you (`server/community.js`): each review casts one vote per dimension from its
+  verdict and signals, weighted by closeness x recency x how much the reviewer has
+  reviewed; the shift is shrunk while evidence is thin (e²/(e²+4), at most 0.7) and the
+  verdicts nudge the score by up to ±12. A card moved 3+ points says so ("3 people
+  with taste like yours said it's too spicy"), and places pushed out of the top 10 are
+  listed below it. **Map · reviews** on a card lists its reviews, closest tastes first;
+  a name opens that reviewer's profile with their taste next to yours; **Kakis** shows
+  your kakis' recent eats (`server/services/communityService.js`).
+- **Demo (admins)** - one button in the top bar opens Demo controls: simulate rain,
+  the review bomb (three seeded spice-shy accounts post "too spicy" reviews of a place,
+  dropped from its card's **Review-bomb this place**, one place at a time, undone from
+  the card or the screen; `server/services/reviewBombService.js`) and Makan Pet's day.
+  **Taste DNA → Edit** sets an admin's real taste by hand (sliders, set all to 0, reset
+  to a new account); until their next review Find builds the taste vector from the
+  sliders' cuisines ("Close to the taste you set").
 - **With friends** - the switch at the top of For you. Pick kakis (or a saved group)
   and Find / Surprise score every venue for everyone (`server/groupMatch.js`): the
   card's sticker is the group average, a row shows each person's own score, and the
@@ -88,8 +105,8 @@ a real sign-in screen. `npm test` runs the engine tests (`node --test`).
 
 ## How the match score works (one slide's worth)
 
-`score = 50 + 25·cuisineAffinity [+ 15·spiceFit + 10·richnessFit − pricePenalty]ᵂᴴᴱᴺ
-ᴷᴺᴼᵂᴺ + 12·tasteSimilarity − distancePenalty − satiationPenalty ± contextModifiers`, clamped to 5-99 and
+`score = 50 + 25·cuisineAffinity − avoidDrag [+ 15·spiceFit + 10·richnessFit − pricePenalty]ᵂᴴᴱᴺ
+ᴷᴺᴼᵂᴺ + 12·tasteSimilarity ± reviewNudge − distancePenalty − satiationPenalty ± contextModifiers`, clamped to 5-99 and
 **capped by information**: `cap = 80 + 4·knownAttributes + min(reviews, 5)`. Every
 applied term emits a human-readable chip - the scoring **is** the explanation.
 Novelty (for Surprise me) is computed from cuisine affinity, never hand-authored.
@@ -98,6 +115,13 @@ prior vectors of venues they ranked above 5/10, `server/vectors.js`) and the ven
 prior vector (MiniLM sentence embedding of name + category + dish gloss, built offline
 by `scripts/embed-venues.mjs`); it fires only when both exist and emits
 "Similar to places you've rated well" above 0.75.
+Spice and richness are what the app *believes* after other people's reviews
+(`server/community.js`); a venue with no data only gets the relative term those
+reviews imply, so "too spicy" can never lift a spice-shy diner. `avoidDrag` is up to
+30 points for a cuisine below 0.15, set by hand or learned from panning it again and
+again ("You avoid turkish"). While an admin's taste is set by hand, the taste vector
+is instead the weighted mean embedding of up to 40 places of each cuisine set above
+0.5 (`server/services/tasteVectors.js`), with the chip "Close to the taste you set".
 The ten curated venues in `server/data/venues.json` merge onto their real Overture
 records at startup (`server/registry.js`) and keep their community taste vectors; in
 the real product those come from dish reviews.

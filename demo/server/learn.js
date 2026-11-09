@@ -241,7 +241,7 @@ const evidenceKey = (s, cuisine) =>
 function pastEvidence(reviews) {
   return reviews
     .filter((r) => !r.undone)
-    .map((r) => new Set((r.signals ?? keywordReading(r.text).signals).map((s) => evidenceKey(s, s.cuisine))))
+    .map((r) => new Set((r.signals ?? keywordReading(r.text, r.sentiment).signals).map((s) => evidenceKey(s, s.cuisine))))
 }
 
 // Where each dimension lives in the profile, and its range.
@@ -348,7 +348,7 @@ export function withEstimate(dish, estimate) {
 // Beli-style entry point; duels arrive resolved as { winner, loser } dishes with cuisine.
 // `reading` is the review text already read (reviewReader.js); without one the
 // keyword list reads `text` here. `estimate` is Claude's estimate of an uncurated dish.
-export function applyBeliReview(state, dish, venue, { sentiment, duels = [], insertIndex = 0, text = '', reading = keywordReading(text), estimate = null }) {
+export function applyBeliReview(state, dish, venue, { sentiment, duels = [], insertIndex = 0, text = '', reading = keywordReading(text, sentiment), estimate = null }) {
   if (!SENTIMENTS.includes(sentiment)) throw new Error(`invalid sentiment "${sentiment}"`)
   const profile = state.profile
   const profileBefore = structuredClone(profile) // what Undo puts back

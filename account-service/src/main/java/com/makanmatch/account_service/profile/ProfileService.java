@@ -1,8 +1,11 @@
 package com.makanmatch.account_service.profile;
 
 import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -19,6 +22,7 @@ import com.makanmatch.account_service.common.ForbiddenException;
 import com.makanmatch.account_service.common.NotFoundException;
 import com.makanmatch.account_service.owner.OwnershipService;
 import com.makanmatch.account_service.profile.dto.MeResponse;
+import com.makanmatch.account_service.profile.dto.PersonCard;
 import com.makanmatch.account_service.profile.dto.UpdateProfileRequest;
 import com.makanmatch.account_service.supabase.SupabaseAuthClient;
 import com.makanmatch.account_service.supabase.SupabaseAuthException;
@@ -29,6 +33,7 @@ import com.makanmatch.account_service.supabase.SupabaseSession;
 public class ProfileService {
 
 	private static final int MAX_DISPLAY_NAME = 40;
+	private static final int MAX_PEOPLE = 50;
 
 	private final ProfileRepository profiles;
 	private final OwnershipService ownership;
@@ -66,6 +71,32 @@ public class ProfileService {
 	@Transactional(readOnly = true)
 	public Map<UUID, Profile> findAll(Collection<UUID> ids) {
 		return profiles.findAllById(ids).stream().collect(Collectors.toMap(Profile::getId, Function.identity()));
+	}
+
+	/**
+	 * Public cards for these accounts, in the order asked, leaving out unknown and disabled ones.
+	 *
+	 * @param ids comma-separated profile ids, at most {@value #MAX_PEOPLE}
+	 */
+	@Transactional(readOnly = true)
+	public List<PersonCard> people(String ids) {
+		Set<UUID> wanted = new LinkedHashSet<>();
+		for (String part : ids.split(",")) {
+			if (part.isBlank()) continue;
+			try {
+				wanted.add(UUID.fromString(part.trim()));
+			}
+			catch (IllegalArgumentException e) {
+				throw new BadRequestException("ids must be comma-separated account ids");
+			}
+		}
+		if (wanted.size() > MAX_PEOPLE) throw new BadRequestException("At most " + MAX_PEOPLE + " people at a time");
+		Map<UUID, Profile> found = findAll(wanted);
+		return wanted.stream()
+				.map(found::get)
+				.filter(profile -> profile != null && !profile.isDisabled())
+				.map(profile -> new PersonCard(profile.getId(), profile.getDisplayName(), profile.getUsername()))
+				.toList();
 	}
 
 	@Transactional(readOnly = true)
