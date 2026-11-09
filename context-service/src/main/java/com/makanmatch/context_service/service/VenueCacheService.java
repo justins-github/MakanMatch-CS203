@@ -5,34 +5,54 @@ import com.makanmatch.context_service.DTO.CatalogVenueDto;
 import com.makanmatch.context_service.DTO.OpeningHoursDto;
 import com.makanmatch.context_service.DTO.VenueStatusDto;
 import com.makanmatch.context_service.exception.CatalogServiceException;
-import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * Catalog venues, loaded on first use and reloaded once older than
+ * {@code catalog.refresh-ms}. Loading lazily (not at startup or on a timer)
+ * keeps startup fast and stops a weather-only request from waking
+ * catalog-service: on Vercel an idle instance is paused, so a timer would not
+ * fire reliably anyway.
+ */
 @Service
 public class VenueCacheService {
     private static final Logger log = LoggerFactory.getLogger(VenueCacheService.class);
     private static final String BOOTSTRAP_QUERY = "an";
+    // After a failed load (e.g. catalog-service still starting), try again soon.
+    private static final Duration RETRY_AFTER_FAILURE = Duration.ofSeconds(30);
+
     private final CatalogServiceClient client;
+    private final Duration maxAge;
+    private final Clock clock;
     private volatile List<CatalogVenueDto> venues = List.of();
     private volatile Instant lastRefreshedAt;
     private volatile String lastRefreshError;
+    private volatile Instant nextRefreshAt = Instant.MIN;
 
-    public VenueCacheService(CatalogServiceClient client) { this.client = client; }
+    @Autowired
+    public VenueCacheService(CatalogServiceClient client, @Value("${catalog.refresh-ms:900000}") long refreshMs) {
+        this(client, Duration.ofMillis(refreshMs), Clock.systemUTC());
+    }
 
-    @PostConstruct
-    public void populateOnStartup() { refresh(); }
+    VenueCacheService(CatalogServiceClient client, Duration maxAge, Clock clock) {
+        this.client = client;
+        this.maxAge = maxAge;
+        this.clock = clock;
+    }
 
-    @Scheduled(fixedDelayString = "${catalog.refresh-ms:900000}")
-    public void refresh() {
+    public synchronized void refresh() {
         try {
             /*
              * The current catalog endpoint requires q and caps each search at 25;
@@ -41,19 +61,34 @@ public class VenueCacheService {
              * a known limitation until catalog-service adds a bulk endpoint.
              */
             venues = List.copyOf(client.searchVenues(BOOTSTRAP_QUERY, 200));
-            lastRefreshedAt = Instant.now();
+            lastRefreshedAt = clock.instant();
             lastRefreshError = null;
+            nextRefreshAt = lastRefreshedAt.plus(maxAge);
             log.info("Loaded {} catalog venues; upstream search is capped and query-scoped", venues.size());
         } catch (CatalogServiceException e) {
-            lastRefreshError = e.getMessage();
-            log.warn("Catalog venue refresh failed; serving {} previously cached venues", venues.size(), e);
+            failed(e.getMessage(), e);
         } catch (RuntimeException e) {
-            lastRefreshError = "Catalog refresh failed: " + e.getMessage();
-            log.warn("Catalog venue refresh failed; serving {} previously cached venues", venues.size(), e);
+            failed("Catalog refresh failed: " + e.getMessage(), e);
         }
     }
 
-    public List<CatalogVenueDto> venues() { return venues; }
+    private void failed(String message, RuntimeException e) {
+        lastRefreshError = message;
+        nextRefreshAt = clock.instant().plus(RETRY_AFTER_FAILURE);
+        log.warn("Catalog venue refresh failed; serving {} previously cached venues", venues.size(), e);
+    }
+
+    /** The cached venues, (re)loading them first when missing or stale. */
+    public List<CatalogVenueDto> venues() {
+        if (!clock.instant().isBefore(nextRefreshAt)) {
+            synchronized (this) {
+                // Another request may have reloaded while this one waited.
+                if (!clock.instant().isBefore(nextRefreshAt)) refresh();
+            }
+        }
+        return venues;
+    }
+
     public int venuesSearched() { return venues.size(); }
 
     /**

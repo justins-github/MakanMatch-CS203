@@ -54,6 +54,50 @@ export async function getContext(from = SMU) {
   return { ...contextFor(forecasts, from), fetchedAt: new Date(cache.at).toISOString() }
 }
 
+// When context-service runs (CONTEXT_SERVICE_URL is set, as it is on Vercel), it
+// answers first: it owns the NEA forecast and the rain categories. The lookup
+// above stays as the fallback, so a slow or still-starting context-service never
+// holds the page up for more than CONTEXT_TIMEOUT_MS.
+const CONTEXT_TIMEOUT_MS = 3000
+const SKIP_AFTER_FAILURE_MS = 15_000
+
+// context-service's WeatherContext in the engine's shape; null when it has no forecast.
+export function contextFromService(body) {
+  if (body?.status !== 'available' || !body.area || !body.forecastText) return null
+  const raining = body.rainCategory !== 'NONE'
+  return {
+    raining,
+    area: body.area,
+    forecast: body.forecastText,
+    summary: raining
+      ? `${body.forecastText} over ${body.area} (next 2h)`
+      : `No rain expected over ${body.area} (next 2h)`,
+    source: 'live',
+    via: 'context-service',
+    rainCategory: body.rainCategory,
+  }
+}
+
+// getContext(from), asking context-service first when its URL is set. After a
+// failure it goes straight to the fallback for a while instead of waiting again.
+export function createContextSource({ contextServiceUrl = null, fetchImpl = fetch, now = Date.now, fallback = getContext } = {}) {
+  if (!contextServiceUrl) return fallback
+  let skipUntil = 0
+  return async (from = SMU) => {
+    if (now() >= skipUntil) {
+      try {
+        const url = `${contextServiceUrl}/api/context/weather?lat=${from.lat}&lng=${from.lon}`
+        const res = await fetchImpl(url, { signal: AbortSignal.timeout(CONTEXT_TIMEOUT_MS) })
+        const context = res.ok ? contextFromService(await res.json()) : null
+        if (context) return { ...context, fetchedAt: new Date(now()).toISOString() }
+      } catch {
+        skipUntil = now() + SKIP_AFTER_FAILURE_MS
+      }
+    }
+    return fallback(from)
+  }
+}
+
 // The demo's "simulate rain" toggle: a clearly labelled override, never mistaken for live data.
 export function withRainOverride(context, simulateRain) {
   if (!simulateRain) return context

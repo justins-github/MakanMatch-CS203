@@ -11,6 +11,14 @@
       "entrypoint": "server/index.js",
       "bindings": [
         { "type": "service", "service": "account", "format": "url", "env": "ACCOUNT_SERVICE_URL" },
+        { "type": "service", "service": "catalog", "format": "url", "env": "CATALOG_SERVICE_URL" },
+        { "type": "service", "service": "context", "format": "url", "env": "CONTEXT_SERVICE_URL" }
+      ]
+    },
+    "context": {
+      "root": "context-service/",
+      "runtime": "container",
+      "bindings": [
         { "type": "service", "service": "catalog", "format": "url", "env": "CATALOG_SERVICE_URL" }
       ]
     },
@@ -29,6 +37,7 @@
   "rewrites": [
     { "source": "/api/:area(auth|me|claims|owner|admin|kakis)/:rest*", "destination": { "service": "account" } },
     { "source": "/api/catalog/:rest*", "destination": { "service": "catalog" } },
+    { "source": "/api/context/weather", "destination": { "service": "context" } },
     { "source": "/api/:rest*", "destination": { "service": "engine" } },
     { "source": "/(.*)", "destination": { "service": "web" } }
   ]

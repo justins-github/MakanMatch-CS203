@@ -128,7 +128,7 @@ flowchart TB
 | **catalog-service** | The venue registry (Overture Maps plus curated seeds), owner status reports, opening hours, dishes, price history, menu-photo scans | [`catalog-service/`](catalog-service) |
 | **engine** | Recommendations, venue search, reviews, rankings and the learned Taste DNA | [`demo/server/`](demo/server) |
 | **web app** | Every screen | [`demo/src/`](demo/src) |
-| **context-service** | OneMap walking times and NEA weather, with rain-adjusted ranking. It runs on its own for now ([details](context-service/README.md)) | [`context-service/`](context-service) |
+| **context-service** | OneMap walking times and NEA weather, with rain-adjusted ranking. When it runs (as on Vercel) the engine gets the weather from it ([details](context-service/README.md)) | [`context-service/`](context-service) |
 
 The code follows three rules:
 
@@ -210,7 +210,7 @@ the diner's kaki before the engine sees their Taste DNA.
 .
 ├── account-service/   Spring Boot: accounts, roles, claims, admin
 ├── catalog-service/   Spring Boot: venues, status reports, hours, menus, prices
-├── context-service/   Spring Boot: walking times and weather (standalone for now)
+├── context-service/   Spring Boot: walking times and weather
 ├── demo/
 │   ├── server/        Express recommendation engine
 │   └── src/           React web app
@@ -334,6 +334,10 @@ On Windows, use `mvnw.cmd` in place of `./mvnw`. The service listens on port 808
 with API docs at http://localhost:8081/swagger-ui/index.html. Its
 [README](context-service/README.md) covers its endpoints and settings.
 
+The weather endpoint needs no OneMap account. To have the engine use it, add
+`CONTEXT_SERVICE_URL=http://localhost:8081` to `.env`. Without it the engine reads
+data.gov.sg itself, which is also its fallback when context-service is slow or down.
+
 ## Running the tests
 
 ```bash
@@ -393,9 +397,9 @@ cd context-service && ./mvnw test
 
 Everything under [What it does](#what-it-does) works end to end. Still to come:
 
-- **context-service isn't wired in yet.** For now the engine reads the
-  data.gov.sg forecast itself. Next, the engine will use context-service for
-  OneMap walking times and rain-adjusted ranking.
+- **context-service is only partly wired in.** The engine gets the weather from
+  it. Next, the engine will use it for OneMap walking times and rain-adjusted
+  ranking.
 - **Menu-photo reading is a proof of concept.** Uploads are validated, but the
   dishes come from a sample reader behind a `MenuReader` interface until a
   vision-model reader is added.

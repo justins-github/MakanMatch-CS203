@@ -7,6 +7,7 @@ import com.makanmatch.context_service.client.NeaWeatherClient;
 import com.makanmatch.context_service.config.WeatherProperties;
 import com.makanmatch.context_service.exception.NeaException;
 import org.junit.jupiter.api.Test;
+import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 
 import java.util.List;
 
@@ -66,6 +67,7 @@ class WeatherServiceTest {
     }
 
     private static WeatherService service(NeaWeatherClient client) {
-        return new WeatherService(client, new WeatherProperties(new WeatherProperties.RainMultiplier(1.25, 1.4)));
+        return new WeatherService(client, new WeatherProperties(new WeatherProperties.RainMultiplier(1.25, 1.4)),
+                new ConcurrentMapCacheManager("weather"));
     }
 }

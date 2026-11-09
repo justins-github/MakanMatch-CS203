@@ -71,7 +71,7 @@ class PlaceQueryPriceTest {
     }
 
     private static class StubWeatherService extends WeatherService {
-        StubWeatherService() { super(null, null); }
+        StubWeatherService() { super(null, null, new org.springframework.cache.concurrent.ConcurrentMapCacheManager("weather")); }
         @Override public WeatherContext getContext(double lat, double lng) {
             return new WeatherContext(RainCategory.NONE, "Clear", "Test", 1.0, "available");
         }

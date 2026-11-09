@@ -18,6 +18,8 @@ export const config = {
   jwtSecret: env.SUPABASE_JWT_SECRET || null,
   accountServiceUrl: withoutTrailingSlash(env.ACCOUNT_SERVICE_URL ?? 'http://localhost:8082'),
   catalogServiceUrl: withoutTrailingSlash(env.CATALOG_SERVICE_URL ?? 'http://localhost:8083'),
+  // Optional: unset (as in `npm run dev`), the engine reads data.gov.sg itself.
+  contextServiceUrl: withoutTrailingSlash(env.CONTEXT_SERVICE_URL) || null,
   db: databaseConfig(),
   // No key = AI off; everything that asks Claude has a non-AI fallback.
   ai: {
