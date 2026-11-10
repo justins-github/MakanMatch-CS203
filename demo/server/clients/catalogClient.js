@@ -5,12 +5,17 @@
 import { unavailable } from '../errors.js'
 
 const BATCH = 100
+// How long to wait for an answer. On Vercel an idle catalog-service is stopped and
+// takes about 13 s to start again, so a shorter wait reads every cold start as an outage.
+const COLD_START_WAIT_MS = 25_000
 
-export function createCatalogClient({ baseUrl, fetchImpl = fetch, statusTtlMs = 60_000, now = Date.now }) {
+export function createCatalogClient({
+  baseUrl, fetchImpl = fetch, statusTtlMs = 60_000, timeoutMs = COLD_START_WAIT_MS, now = Date.now,
+}) {
   async function get(path) {
     let res
     try {
-      res = await fetchImpl(`${baseUrl}${path}`, { signal: AbortSignal.timeout(5000) })
+      res = await fetchImpl(`${baseUrl}${path}`, { signal: AbortSignal.timeout(timeoutMs) })
     } catch {
       throw unavailable('The catalog service is unreachable - is it running?')
     }
@@ -50,6 +55,16 @@ export function createCatalogClient({ baseUrl, fetchImpl = fetch, statusTtlMs = 
   }
 
   return {
+    // Is catalog-service awake? Any answer counts; asking wakes it.
+    async ping() {
+      try {
+        await fetchImpl(`${baseUrl}/api/catalog/venue-status`, { signal: AbortSignal.timeout(timeoutMs) })
+        return true
+      } catch {
+        return false
+      }
+    },
+
     // A venue's live menu, or null for an unknown venue.
     menu: (venueId) => get(`/api/catalog/venues/${encodeURIComponent(venueId)}/dishes`),
 
