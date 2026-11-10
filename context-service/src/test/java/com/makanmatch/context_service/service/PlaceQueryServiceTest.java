@@ -105,7 +105,8 @@ class PlaceQueryServiceTest {
         NeaWeatherClient neaClient = mock(NeaWeatherClient.class);
         when(neaClient.getLatestForecast()).thenThrow(new NeaException("simulated NEA outage"));
         WeatherService weather = new WeatherService(neaClient,
-                new WeatherProperties(new WeatherProperties.RainMultiplier(1.25, 1.4)));
+                new WeatherProperties(new WeatherProperties.RainMultiplier(1.25, 1.4)),
+                new org.springframework.cache.concurrent.ConcurrentMapCacheManager("weather"));
         when(oneMapClient.getWalkRoute(ORIGIN_LAT, ORIGIN_LNG, place.lat(), place.lng()))
                 .thenReturn(new WalkRouteDto(300, 500));
         PlaceQueryService service = service(List.of(place), oneMapClient, 15, 200, weather);

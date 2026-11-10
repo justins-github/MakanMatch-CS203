@@ -37,7 +37,7 @@ import { createReviewBombService } from './services/reviewBombService.js'
 import { createReviewService } from './services/reviewService.js'
 import { fileVectorSource, pgVectorSource } from './services/tasteVectors.js'
 import { loadVectorStore } from './vectors.js'
-import { getContext } from './weather.js'
+import { createContextSource } from './weather.js'
 
 if (!config.supabaseUrl) {
   console.error('SUPABASE_URL is not set. Copy .env.example to .env at the repo root and fill it in.')
@@ -66,6 +66,10 @@ else console.log(`taste vectors: ${vectors.size} venues via ${vectors.kind} (${v
 // Claude reads review text when a key is set; otherwise the keyword list does.
 const ai = createAiClient(config.ai)
 console.log(ai.available ? `review reader: Claude (${ai.model})` : 'review reader: keyword matching (set ANTHROPIC_API_KEY to use Claude)')
+
+// Weather: context-service when it runs, data.gov.sg directly otherwise (and as its fallback).
+const getContext = createContextSource({ contextServiceUrl: config.contextServiceUrl })
+console.log(config.contextServiceUrl ? 'weather: context-service, data.gov.sg as fallback' : 'weather: data.gov.sg')
 
 const accounts = createAccountClient({ baseUrl: config.accountServiceUrl })
 const catalog = createCatalogClient({ baseUrl: config.catalogServiceUrl })

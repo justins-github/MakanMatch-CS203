@@ -6,6 +6,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.makanmatch.context_service.client.NeaForecastResponse;
 import com.makanmatch.context_service.client.NeaWeatherClient;
+import com.makanmatch.context_service.exception.NeaException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -69,5 +70,33 @@ class WeatherCachingIntegrationTest {
                 .count();
         assertThat(loadLogs).isEqualTo(1);
         verify(neaWeatherClient, times(1)).getLatestForecast();
+    }
+
+    @Test
+    void differentLocationsShareOneForecastFetch() {
+        assertThat(weatherService.getContext(1.292, 103.844).area()).isEqualTo("City");
+        assertThat(weatherService.getContext(1.300, 103.850).area()).isEqualTo("City");
+        assertThat(weatherService.getContext(1.3521, 103.8198).status()).isEqualTo("available");
+
+        verify(neaWeatherClient, times(1)).getLatestForecast();
+    }
+
+    @Test
+    void aFailedFetchIsNotCached() {
+        when(neaWeatherClient.getLatestForecast())
+                .thenThrow(new NeaException("simulated NEA failure"))
+                .thenReturn(cityForecast());
+
+        assertThat(weatherService.getContext(1.292, 103.844).status()).isEqualTo("unavailable");
+        assertThat(weatherService.getContext(1.292, 103.844).status()).isEqualTo("available");
+        verify(neaWeatherClient, times(2)).getLatestForecast();
+    }
+
+    private static NeaForecastResponse.Data cityForecast() {
+        return new NeaForecastResponse.Data(
+                List.of(new NeaForecastResponse.AreaMetadata("City",
+                        new NeaForecastResponse.LabelLocation(1.292, 103.844))),
+                List.of(new NeaForecastResponse.ForecastItem(
+                        List.of(new NeaForecastResponse.Forecast("City", "Cloudy")))));
     }
 }

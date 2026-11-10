@@ -18,6 +18,8 @@ export const config = {
   jwtSecret: env.SUPABASE_JWT_SECRET || null,
   accountServiceUrl: withoutTrailingSlash(env.ACCOUNT_SERVICE_URL ?? 'http://localhost:8082'),
   catalogServiceUrl: withoutTrailingSlash(env.CATALOG_SERVICE_URL ?? 'http://localhost:8083'),
+  // Optional: unset (as in `npm run dev`), the engine reads data.gov.sg itself.
+  contextServiceUrl: withoutTrailingSlash(env.CONTEXT_SERVICE_URL) || null,
   db: databaseConfig(),
   // The seeded demo accounts' shared password (scripts/seed-accounts.mjs). The engine uses
   // it only for an admin's "Simulate review bomb"; without it that button says how to set up.
