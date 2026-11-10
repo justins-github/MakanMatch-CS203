@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getContext, getRecommendations, postReset, setLocation } from './api/engineApi.js'
+import { getContext, getRecommendations, postReset, setLocation, warmServices } from './api/engineApi.js'
 import { useAuth } from './auth/AuthContext.jsx'
 import { BottomNav, TopBar } from './components/AppNav.jsx'
 import ContextBanner from './components/ContextBanner.jsx'
@@ -11,6 +11,7 @@ import Review from './components/Review.jsx'
 import ReviewerProfile from './components/reviews/ReviewerProfile.jsx'
 import DemoPanel from './components/DemoPanel.jsx'
 import { ReviewBombProvider } from './components/ReviewBomb.jsx'
+import { startKeepWarm } from './keepWarm.js'
 import { movesBetween } from './rankMoves.js'
 import Splash from './components/Splash.jsx'
 import TasteDna from './components/TasteDna.jsx'
@@ -33,6 +34,9 @@ export default function App() {
   useEffect(() => {
     if (status === 'signedOut') setScreen('login')
   }, [status])
+
+  // From the splash on, so the services are awake by the first Find.
+  useEffect(() => startKeepWarm({ ping: warmServices }), [])
 
   useEffect(() => {
     const leave = setTimeout(() => setSplash('leaving'), SPLASH_MS)

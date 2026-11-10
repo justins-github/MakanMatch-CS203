@@ -71,3 +71,34 @@ test('venues without a usable typical price are left out', async () => {
   const client = createCatalogClient({ baseUrl: 'http://catalog', fetchImpl: catalog.fetchImpl })
   assert.deepEqual([...(await client.venuePrices())], [['a', 8.5]])
 })
+
+// Answers after `ms`, unless the caller stops waiting first (as fetch does when its signal aborts).
+const slowFetch = (ms, body) => (_url, { signal }) => new Promise((resolve, reject) => {
+  const timer = setTimeout(() => resolve(new Response(JSON.stringify(body), { status: 200 })), ms)
+  signal.addEventListener('abort', () => {
+    clearTimeout(timer)
+    reject(signal.reason)
+  })
+})
+
+test('gives up on a catalog slower than timeoutMs', async () => {
+  const client = createCatalogClient({ baseUrl: 'http://catalog', fetchImpl: slowFetch(300, []), timeoutMs: 20 })
+  await assert.rejects(client.menu('moona-thai'), { status: 503 })
+})
+
+// The warm-up (routes/warm.js) only needs to know the service is awake.
+test('ping: any answer means the catalog is awake', async () => {
+  const catalog = fakeCatalog([])
+  const client = createCatalogClient({ baseUrl: 'http://catalog', fetchImpl: catalog.fetchImpl })
+  assert.equal(await client.ping(), true)
+  assert.deepEqual(catalog.calls, ['http://catalog/api/catalog/venue-status'])
+})
+
+test('ping: an unreachable or too-slow catalog is false, not an error', async () => {
+  const catalog = fakeCatalog([])
+  catalog.goDown()
+  const down = createCatalogClient({ baseUrl: 'http://catalog', fetchImpl: catalog.fetchImpl })
+  assert.equal(await down.ping(), false)
+  const slow = createCatalogClient({ baseUrl: 'http://catalog', fetchImpl: slowFetch(300, []), timeoutMs: 20 })
+  assert.equal(await slow.ping(), false)
+})

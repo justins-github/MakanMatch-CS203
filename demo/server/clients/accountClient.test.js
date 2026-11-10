@@ -73,3 +73,38 @@ test('signIn: an unreachable or failing account service says so', async () => {
   const { client } = fakeAccounts(() => json({}, 429))
   await assert.rejects(client.signIn('hafiz_nospice', 'pw'), { status: 503 })
 })
+
+// Answers after `ms`, unless the caller stops waiting first (as fetch does when its signal aborts).
+const slowFetch = (ms, respond) => (_url, { signal }) => new Promise((resolve, reject) => {
+  const timer = setTimeout(() => resolve(respond()), ms)
+  signal.addEventListener('abort', () => {
+    clearTimeout(timer)
+    reject(signal.reason)
+  })
+})
+
+for (const [name, call] of [['me', (c) => c.me('t')], ['kakis', (c) => c.kakis('t')], ['party', (c) => c.party('t', [HAFIZ.id])]]) {
+  test(`${name}: gives up on an account service slower than timeoutMs`, async () => {
+    const client = createAccountClient({ baseUrl: 'http://accounts', fetchImpl: slowFetch(300, () => json({})), timeoutMs: 20 })
+    await assert.rejects(call(client), { status: 503 })
+  })
+}
+
+// The warm-up (routes/warm.js) only needs to know the service is awake.
+test('ping: any answer means the account service is awake, even a 401', async () => {
+  const asked = []
+  const fetchImpl = async (url) => {
+    asked.push(url)
+    return json({ detail: 'Please sign in' }, 401)
+  }
+  const client = createAccountClient({ baseUrl: 'http://accounts', fetchImpl })
+  assert.equal(await client.ping(), true)
+  assert.deepEqual(asked, ['http://accounts/api/me'])
+})
+
+test('ping: an unreachable or too-slow account service is false, not an error', async () => {
+  const down = createAccountClient({ baseUrl: 'http://accounts', fetchImpl: async () => { throw new Error('ECONNREFUSED') } })
+  assert.equal(await down.ping(), false)
+  const slow = createAccountClient({ baseUrl: 'http://accounts', fetchImpl: slowFetch(300, () => json({})), timeoutMs: 20 })
+  assert.equal(await slow.ping(), false)
+})

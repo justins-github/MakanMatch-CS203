@@ -30,6 +30,7 @@ import { reviewBombRoutes } from './routes/reviewBomb.js'
 import { recommendationRoutes } from './routes/recommendations.js'
 import { reviewRoutes } from './routes/reviews.js'
 import { venueRoutes } from './routes/venues.js'
+import { warmRoutes } from './routes/warm.js'
 import { dbLearnerStore, memoryLearnerStore } from './services/learnerStore.js'
 import { createProfileService } from './services/profileService.js'
 import { createRecommendationService } from './services/recommendationService.js'
@@ -91,6 +92,7 @@ const app = express()
 app.disable('x-powered-by')
 app.use(express.json({ limit: '32kb' }))
 app.use(contextRoutes({ getContext })) // public
+app.use(warmRoutes({ accounts, catalog })) // public
 app.use('/api', authenticated) // everything below needs a signed-in user
 app.use(recommendationRoutes({ recommendations, getContext }))
 app.use(locationRoutes({ oneMap: createOneMapClient() }))

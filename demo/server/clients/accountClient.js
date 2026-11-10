@@ -3,7 +3,13 @@
 // Answers are cached briefly per token, so a burst of requests costs one call.
 import { badRequest, unavailable } from '../errors.js'
 
-export function createAccountClient({ baseUrl, fetchImpl = fetch, ttlMs = 30_000, now = Date.now }) {
+// How long to wait for an answer. On Vercel an idle account-service is stopped and
+// takes about 13 s to start again, so a shorter wait turns every cold start into a 503.
+const COLD_START_WAIT_MS = 25_000
+
+export function createAccountClient({
+  baseUrl, fetchImpl = fetch, ttlMs = 30_000, timeoutMs = COLD_START_WAIT_MS, now = Date.now,
+}) {
   const cache = new Map()
 
   async function getJson(path, token) {
@@ -11,7 +17,7 @@ export function createAccountClient({ baseUrl, fetchImpl = fetch, ttlMs = 30_000
     try {
       res = await fetchImpl(`${baseUrl}${path}`, {
         headers: { authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(timeoutMs),
       })
     } catch {
       throw unavailable('The account service is unreachable - is it running?')
@@ -21,6 +27,16 @@ export function createAccountClient({ baseUrl, fetchImpl = fetch, ttlMs = 30_000
   }
 
   return {
+    // Is account-service awake? Any answer counts (this one is a 401); asking wakes it.
+    async ping() {
+      try {
+        await fetchImpl(`${baseUrl}/api/me`, { signal: AbortSignal.timeout(timeoutMs) })
+        return true
+      } catch {
+        return false
+      }
+    },
+
     // The caller's MeResponse, or null when account-service rejects the token
     // (expired, or the account was disabled).
     async me(token, actAs = null) {
@@ -32,7 +48,7 @@ export function createAccountClient({ baseUrl, fetchImpl = fetch, ttlMs = 30_000
       try {
         res = await fetchImpl(`${baseUrl}/api/me`, {
           headers: { authorization: `Bearer ${token}`, ...(actAs ? { 'x-act-as': actAs } : {}) },
-          signal: AbortSignal.timeout(5000),
+          signal: AbortSignal.timeout(timeoutMs),
         })
       } catch {
         throw unavailable('The account service is unreachable - is it running?')
@@ -55,7 +71,7 @@ export function createAccountClient({ baseUrl, fetchImpl = fetch, ttlMs = 30_000
       try {
         res = await fetchImpl(`${baseUrl}/api/kakis/party?ids=${ids.map(encodeURIComponent).join(',')}`, {
           headers: { authorization: `Bearer ${token}` },
-          signal: AbortSignal.timeout(5000),
+          signal: AbortSignal.timeout(timeoutMs),
         })
       } catch {
         throw unavailable('The account service is unreachable - is it running?')
@@ -89,7 +105,7 @@ export function createAccountClient({ baseUrl, fetchImpl = fetch, ttlMs = 30_000
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ identifier, password }),
-          signal: AbortSignal.timeout(10_000),
+          signal: AbortSignal.timeout(timeoutMs),
         })
       } catch {
         throw unavailable('The account service is unreachable - is it running?')

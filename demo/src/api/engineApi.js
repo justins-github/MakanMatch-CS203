@@ -12,6 +12,9 @@ const located = () => (here ? { 'x-location': `${here.lat},${here.lon}` } : {})
 export const getContext = (simRain = false) =>
   request(`/api/context${simRain ? '?rain=1' : ''}`, { auth: false, headers: located() })
 
+// Wakes the engine and the services behind it (see keepWarm.js); never fails.
+export const warmServices = () => request('/api/warm', { auth: false }).catch(() => null)
+
 // withIds: kakis eating with you (group mode); empty for just you. walkMin: how far to look.
 export function getRecommendations(mode, mood = 'none', simRain = false, exclude = [], withIds = [], walkMin = 20) {
   const params = new URLSearchParams({ mode, mood, walk: walkMin })
