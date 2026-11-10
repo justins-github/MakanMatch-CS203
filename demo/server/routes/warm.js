@@ -1,7 +1,7 @@
-// Public: wakes the two services the engine calls. Vercel stops a service that has had
-// no requests for a while (30 s on a preview deployment, 5 min in production) and
-// starting one again takes about 13 s, so the web app calls this when it opens and
-// while it stays on screen (src/keepWarm.js). Reaching this route wakes the engine too.
+// Public: wakes the two services the engine calls. Vercel stops a service about 30 s
+// after its last request (measured on the live site) and starting one again takes
+// about 13 s, so the web app calls this when it opens and while it stays on screen
+// (src/keepWarm.js). Reaching this route wakes the engine too.
 import { Router } from 'express'
 import { asyncHandler } from '../errors.js'
 

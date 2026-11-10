@@ -10,8 +10,12 @@ spring:
     username: ${DB_USER}
     password: ${DB_PASSWORD}
     hikari:
-      # Supabase's free session pooler allows few clients; three services share it.
+      # Supabase's session pooler allows 25 clients in all, shared by every live
+      # deployment and everyone's `npm run dev`. So take at most three, and give
+      # back any left unused for 30 s instead of holding all three while idle.
       maximum-pool-size: ${DB_POOL_SIZE:3}
+      minimum-idle: 0
+      idle-timeout: 30000
   jpa:
     open-in-view: false
     hibernate:
