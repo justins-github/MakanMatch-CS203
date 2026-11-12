@@ -19,11 +19,13 @@ import { openDatabase } from './db/pool.js'
 import { errorHandler } from './errors.js'
 import { starterProfile } from './learn.js'
 import { createTokenVerifier, requireAuth } from './middleware/requireAuth.js'
-import { loadRegistry } from './registry.js'
+import { createMonths, loadMonthFiles } from './months.js'
+import { loadRegistryInputs } from './registry.js'
 import { venueEmbeddingRepository } from './repositories/venueEmbeddingRepository.js'
 import { createReviewReader } from './reviewReader.js'
 import { createSummaryWriter } from './tasteSummary.js'
 import { contextRoutes } from './routes/context.js'
+import { demoMonthRoutes } from './routes/demoMonths.js'
 import { locationRoutes } from './routes/location.js'
 import { profileRoutes } from './routes/profile.js'
 import { reviewBombRoutes } from './routes/reviewBomb.js'
@@ -47,7 +49,11 @@ if (!config.supabaseUrl) {
 
 const here = dirname(fileURLToPath(import.meta.url))
 const seedDishes = JSON.parse(readFileSync(join(here, 'data', 'dishes.json'), 'utf8'))
-const registry = loadRegistry()
+// August is the registry everyone gets; later months are the demo's Month switch (months.js).
+const months = createMonths({ ...loadRegistryInputs(), deltas: loadMonthFiles(join(here, 'data')) })
+const registry = months.base
+console.log(`venue registry: ${registry.stats.total} venues (${registry.stats.overture} from Overture); months: ${months.list.map((m) => m.label).join(', ')}`)
+if (registry.stats.unmatched.length) console.log(`community-only seeds (no Overture match): ${registry.stats.unmatched.join(', ')}`)
 
 // Learning state: Postgres when configured (survives restarts), else memory.
 const db = await openDatabase(config.db)
@@ -75,7 +81,7 @@ console.log(config.contextServiceUrl ? 'weather: context-service, data.gov.sg as
 const accounts = createAccountClient({ baseUrl: config.accountServiceUrl })
 const catalog = createCatalogClient({ baseUrl: config.catalogServiceUrl })
 const recommendations = createRecommendationService({
-  registry, vectors, learners, catalog, accounts, explainer: createChangeExplainer({ ai }),
+  registry, months, vectors, learners, catalog, accounts, explainer: createChangeExplainer({ ai }),
 })
 const reviews = createReviewService({
   registry, learners, catalog, seedDishes, vectors, reader: createReviewReader({ ai }), estimator: createDishEstimator({ ai }),
@@ -94,9 +100,10 @@ app.use(express.json({ limit: '32kb' }))
 app.use(contextRoutes({ getContext })) // public
 app.use(warmRoutes({ accounts, catalog })) // public
 app.use('/api', authenticated) // everything below needs a signed-in user
-app.use(recommendationRoutes({ recommendations, getContext }))
+app.use(recommendationRoutes({ recommendations, getContext, months }))
 app.use(locationRoutes({ oneMap: createOneMapClient() }))
-app.use(venueRoutes({ recommendations }))
+app.use(venueRoutes({ recommendations, months }))
+app.use(demoMonthRoutes({ recommendations, months }))
 app.use(reviewRoutes({ reviews }))
 app.use(profileRoutes({ profiles }))
 app.use(communityRoutes({ community }))

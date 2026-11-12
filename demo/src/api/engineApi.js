@@ -9,6 +9,26 @@ export function setLocation(point) {
 }
 const located = () => (here ? { 'x-location': `${here.lat},${here.lon}` } : {})
 
+// The demo's Month switch (admins): the month the scoring calls ask for, and the gone
+// places this viewer says are still open. Unset, the engine serves the month we started from.
+let demoMonth = null
+let reopened = []
+export function setDemoMonth(month) {
+  demoMonth = month || null
+}
+export function setReopened(ids) {
+  reopened = [...ids]
+}
+const withReopened = (params, ids) => {
+  if (ids.length) params.set('reopen', ids.join(','))
+  return params
+}
+const withDemoMonth = (params) => {
+  if (!demoMonth) return params
+  params.set('month', demoMonth)
+  return withReopened(params, reopened)
+}
+
 export const getContext = (simRain = false) =>
   request(`/api/context${simRain ? '?rain=1' : ''}`, { auth: false, headers: located() })
 
@@ -21,12 +41,12 @@ export function getRecommendations(mode, mood = 'none', simRain = false, exclude
   if (simRain) params.set('rain', '1')
   if (exclude.length) params.set('exclude', exclude.join(','))
   if (withIds.length) params.set('with', withIds.join(','))
-  return request(`/api/recommendations?${params}`, { headers: located() })
+  return request(`/api/recommendations?${withDemoMonth(params)}`, { headers: located() })
 }
 
 // Typeahead search; pass an AbortSignal to cancel superseded requests.
 export function searchVenues(q, { limit = 8, signal } = {}) {
-  const params = new URLSearchParams({ q, limit })
+  const params = withDemoMonth(new URLSearchParams({ q, limit }))
   return request(`/api/venues/search?${params}`, { signal, headers: located() })
 }
 
@@ -66,6 +86,15 @@ export const putDials = (body) => request('/api/profile/dials', { method: 'PUT',
 export const getReviewBomb = () => request('/api/demo/review-bomb')
 export const dropReviewBomb = (venueId) => request('/api/demo/review-bomb', { method: 'POST', body: { venueId } })
 export const undoReviewBomb = () => request('/api/demo/review-bomb', { method: 'DELETE' })
+
+// The Month switch (admins): the months that can be loaded, and what changed in one for
+// you, near where you are. stillOpen: gone places you've said are still open.
+export const getMonths = () => request('/api/demo/months')
+export const getMonthChanges = (month, walkMin = 20, stillOpen = []) =>
+  request(
+    `/api/demo/months/${encodeURIComponent(month)}/changes?${withReopened(new URLSearchParams({ walk: walkMin }), stillOpen)}`,
+    { headers: located() },
+  )
 
 // Other people's reviews: a venue's, a reviewer's profile, and your kakis' recent eats.
 export const getVenueReviews = (venueId) => request(`/api/venues/${encodeURIComponent(venueId)}/reviews`)

@@ -7,6 +7,7 @@ import { DEFAULT_WALK_MIN, SMU, nearestArea, venuesNear, walkMinutes } from '../
 import { AIMED_FLOOR, groupFind, groupSurprise } from '../groupMatch.js'
 import { applyOpeningHours } from '../hours.js'
 import { pickSurprise, priceLevel, rankVenues } from '../match.js'
+import { BASE_MONTH } from '../months.js'
 import { searchVenues } from '../search.js'
 import { createSliderVectors, learnedVector, tasteContext } from './tasteVectors.js'
 
@@ -15,12 +16,24 @@ const CLOSED = new Set(['CLOSED', 'TEMPORARILY_CLOSED'])
 const DAY_MS = 24 * 60 * 60 * 1000
 const TOP = 10 // how many places Find shows
 const MAX_DROPPED = 3
+const MAX_GONE = 5 // how many gone and new places the Month switch's change list names
+const MAX_ADDED = 3
 const byMatch = (a, b) => b.matchScore - a.matchScore
 const standingBy = (reviews) => reviews.filter((r) => !r.undone).length
 
 export function createRecommendationService({
-  registry, vectors, learners, catalog, accounts, explainer = createChangeExplainer({ ai: null }), now = () => new Date(),
+  registry, months = null, vectors, learners, catalog, accounts, explainer = createChangeExplainer({ ai: null }), now = () => new Date(),
 }) {
+  // The venues to rank and search: the base registry, unless the demo's Month switch
+  // names a month (months.js). A gone place the diner says is still open comes back
+  // for them, tagged. Taste and "since your last visit" always read the base.
+  function worldFor(month, reopened = []) {
+    const world = months && month !== undefined ? months.registryFor(month) : registry
+    const back = [...new Set(reopened)].map((id) => world.ghosts?.get(id)).filter(Boolean).map((v) => ({ ...v, monthChange: 'reopened' }))
+    const backIds = new Set(back.map((v) => v.id))
+    return { world, back, backIds, isGone: (venue) => Boolean(world.ghosts?.has(venue.id)) && !backIds.has(venue.id) }
+  }
+
   // Owner reports are a live signal; if the catalog is down we still recommend, and say so.
   async function ownerReports() {
     try {
@@ -47,6 +60,24 @@ export function createRecommendationService({
       return { rows, people: await learners.peopleFacts([...new Set(rows.map((r) => r.userId))]) }
     } catch {
       return { rows: [], people: new Map() }
+    }
+  }
+
+  // What a later month did to this diner's picks: which of them left (places that would
+  // still be in the top if they were listed) and how many new places made it in. `ranked`
+  // is the month's own list, best first. A place that stopped being a food place counts
+  // as left here, though it is never listed as a change: the list did change.
+  async function monthOnPicks(me, world, backIds, ranked, { from, walkMin, prices, scene }) {
+    const departed = [...(world.departed?.values() ?? [])].filter((v) => !backIds.has(v.id))
+    const { allowed } = applyDietary(withLivePrices(venuesNear(departed, from, walkMin), prices), [me.restrictions])
+    const before = allowed.length > 0
+      ? (await rankedFor(me, allowed, scene, await crowdAt(allowed.map((v) => v.id)))).ranked
+      : []
+    const beforeIds = new Set(before.map((v) => v.id))
+    const then = [...ranked.filter((v) => v.monthChange !== 'new'), ...before].sort(byMatch).slice(0, TOP)
+    return {
+      left: then.filter((v) => beforeIds.has(v.id)).map((v) => ({ id: v.id, name: v.name, reason: v.monthChange })),
+      arrived: ranked.slice(0, TOP).filter((v) => v.monthChange === 'new').length,
     }
   }
 
@@ -180,7 +211,8 @@ export function createRecommendationService({
     // mode: 'find' (top 10) | 'surprise' (one experimental pick, skipping `exclude`).
     // withIds: kakis eating with the caller; account-service checks they are kakis.
     // Only venues within `walkMin` of `from` (the caller's spot, for the whole table) count.
-    async recommend(user, { mode, mood, context, exclude = [], withIds = [], from = SMU, walkMin = DEFAULT_WALK_MIN }) {
+    // month, reopened: the demo's Month switch (see worldFor).
+    async recommend(user, { mode, mood, context, exclude = [], withIds = [], from = SMU, walkMin = DEFAULT_WALK_MIN, month, reopened = [] }) {
       const kakis = withIds.length > 0 ? await accounts.party(user.token, withIds) : []
       const me = { id: user.id, name: user.me.displayName, restrictions: user.me.dietary?.restrictions ?? [] }
       const people = [me, ...kakis.map((k) => ({ id: k.id, name: k.displayName, restrictions: k.restrictions ?? [] }))]
@@ -189,7 +221,9 @@ export function createRecommendationService({
         ownerReports(), openingHours(), learners.read(me.id, me.name), livePrices(),
       ])
       const visits = lastVisitsByVenue(mine.reviews)
-      const nearby = venuesNear(registry.venues, from, walkMin)
+      const { world, back, backIds } = worldFor(month, reopened)
+      const later = months?.changesFor(month) ?? null // null on the month we started from
+      const nearby = venuesNear([...world.venues, ...back], from, walkMin)
       const { open: notClosed, closed } = applyOwnerReports(withLivePrices(nearby, prices), reports.byVenue)
       const { open, shutNow } = applyOpeningHours(notClosed, hours, now())
       // Halal and vegetarian are dealbreakers for anyone at the table.
@@ -201,6 +235,7 @@ export function createRecommendationService({
         near: { area: nearestArea(from), walkMin },
         ownerReports: { available: reports.available, closedNearby: closedYourPlacesFirst(closed, visits), shutNow },
         dietary: { dropped },
+        ...(later ? { month: { label: later.label, since: BASE_MONTH.label } } : {}),
       }
       const scene = { raining: context.raining, mood }
       const crowd = await crowdAt(allowed.map((v) => v.id))
@@ -217,6 +252,7 @@ export function createRecommendationService({
         const you = await rankedFor(me, allowed, scene, crowd)
         const ranked = you.ranked.sort(byMatch)
         const top = ranked.slice(0, TOP)
+        if (later) Object.assign(answer.month, await monthOnPicks(me, world, backIds, ranked, { from, walkMin, prices, scene }))
         const dropped = droppedByReviews(ranked, you)
         const cards = await withSinceLastVisit([...top, ...dropped], visits, { score: you.score, profile: you.profile })
         const told = await withReviewChange(cards, you, user)
@@ -259,12 +295,66 @@ export function createRecommendationService({
       return explanationFor(key, scope, { venueName: venue.name, changes, match, profile: mine.profile })
     },
 
-    // Match % includes the walk from `from`, so it agrees with the feed's.
-    async search(user, query, limit, from = SMU) {
+    // The demo's Month switch: what left and what arrived in `month`, for this diner.
+    // Gone places they have reviewed lead (anywhere in Singapore), each with the nearby
+    // place closest to it in taste; then other gone places and the best-matching new ones
+    // within `walkMin` of `from`, scored as Find scores. Null for the base month.
+    async monthChanges(user, { month, from = SMU, walkMin = DEFAULT_WALK_MIN, reopened = [] }) {
+      const changes = months?.changesFor(month)
+      if (!changes) return null
+      const { world, back, backIds } = worldFor(month, reopened)
+      const me = { id: user.id, name: user.me.displayName, restrictions: user.me.dietary?.restrictions ?? [] }
+      const [mine, prices] = await Promise.all([learners.read(me.id, me.name), livePrices()])
+      const yourScores = yourScoresByVenue(mine.reviews)
+
+      // The month's places within the walk that suit this diner, with their match.
+      const { allowed } = applyDietary(withLivePrices(venuesNear([...world.venues, ...back], from, walkMin), prices), [me.restrictions])
+      const you = await rankedFor(me, allowed, { raining: false, mood: null }, await crowdAt(allowed.map((v) => v.id)))
+      const nearby = you.ranked.sort(byMatch)
+      const card = (v) => ({ id: v.id, name: v.name, address: v.address ?? null })
+
+      const stillGone = [...changes.gone.values()].filter((g) => !backIds.has(g.venue.id))
+      const visited = stillGone.filter((g) => yourScores.has(g.venue.id))
+        .sort((a, b) => yourScores.get(b.venue.id) - yourScores.get(a.venue.id))
+      const replacements = await closestInTaste(vectors, visited.map((g) => g.venue), nearby)
+      const yours = visited.map(({ reason, venue }) => {
+        const next = replacements.get(venue.id)
+        return {
+          ...card(venue),
+          reason,
+          yourScore: yourScores.get(venue.id),
+          replacement: next ? { id: next.id, name: next.name, matchScore: next.matchScore, distanceMin: next.distanceMin } : null,
+        }
+      })
+
+      const reasonOf = new Map(stillGone.map((g) => [g.venue.id, g.reason]))
+      const goneNearby = venuesNear(stillGone.filter((g) => !yourScores.has(g.venue.id)).map((g) => g.venue), from, walkMin)
+        .map((v) => ({ ...card(v), reason: reasonOf.get(v.id), distanceMin: v.distanceMin }))
+        .sort((a, b) => (a.reason === 'closed' ? 0 : 1) - (b.reason === 'closed' ? 0 : 1) || a.distanceMin - b.distanceMin)
+      const addedNearby = nearby.filter((v) => v.monthChange === 'new')
+        .map((v) => ({ ...card(v), cuisine: v.cuisine ?? null, matchScore: v.matchScore, distanceMin: v.distanceMin }))
+
+      return {
+        month: changes.month,
+        label: changes.label,
+        since: BASE_MONTH.label,
+        yours,
+        gone: goneNearby.slice(0, MAX_GONE),
+        added: addedNearby.slice(0, MAX_ADDED),
+        nearby: { gone: goneNearby.length, added: addedNearby.length },
+        totals: changes.totals,
+      }
+    },
+
+    // Match % includes the walk from `from`, so it agrees with the feed's. On a later
+    // month, places that left are still found where they used to rank, tagged (`change`)
+    // and with no match shown.
+    async search(user, query, limit, from = SMU, { month, reopened = [] } = {}) {
+      const { world, backIds, isGone } = worldFor(month, reopened)
       const [state, prices, crowd] = await Promise.all([learners.read(user.id, user.me.displayName), livePrices(), crowdAt(null)])
       const yours = yourScoresByVenue(state.reviews)
       const community = reviewsFor(viewerFrom({ id: user.id }, state), crowd)
-      const results = searchVenues(registry.searchIndex, query, {
+      const results = searchVenues(world.searchIndex, query, {
         limit,
         scoreFn: (venue) => rankVenues(withLivePrices([withWalkFrom(from, venue)], prices), state.profile, { community })[0].matchScore,
       })
@@ -275,8 +365,9 @@ export function createRecommendationService({
         address: venue.address ?? null,
         cuisine: venue.cuisine ?? null,
         distanceMin: withWalkFrom(from, venue).distanceMin ?? null,
-        matchScore,
+        matchScore: isGone(venue) ? null : matchScore,
         yourScore: yours.get(venue.id) ?? null,
+        change: backIds.has(venue.id) ? 'reopened' : venue.monthChange ?? null,
         highlight,
       }))
     },
@@ -296,6 +387,33 @@ function droppedByReviews(ranked, you) {
     .sort((a, b) => b.drop - a.drop)
     .slice(0, MAX_DROPPED)
     .map(({ venue }) => venue)
+}
+
+// For each gone venue, the candidate whose embedding is closest to its own: the nearest
+// thing in taste to a place that left. A venue with no embedding, or no candidates with
+// one, gets nothing; so does everyone when the embeddings can't be read.
+async function closestInTaste(vectors, goneVenues, candidates) {
+  const closest = new Map()
+  const known = goneVenues.filter((v) => v.gersId)
+  const pool = candidates.filter((v) => v.gersId)
+  if (!vectors?.vectorsFor || !vectors.size || known.length === 0 || pool.length === 0) return closest
+  try {
+    const own = await vectors.vectorsFor(known.map((v) => v.gersId))
+    for (const venue of known) {
+      const vector = own.get(venue.gersId)
+      if (!vector) continue
+      const similar = await vectors.similarities(pool.filter((v) => v.id !== venue.id).map((v) => v.gersId), vector)
+      let best = null
+      for (const candidate of pool) {
+        const similarity = similar.get(candidate.gersId)
+        if (similarity != null && candidate.id !== venue.id && (!best || similarity > best.similarity)) best = { candidate, similarity }
+      }
+      if (best) closest.set(venue.id, best.candidate)
+    }
+  } catch {
+    // No replacements is a fine answer; the change list still stands.
+  }
+  return closest
 }
 
 // The venue with its walk time from `from`, when it has coordinates.

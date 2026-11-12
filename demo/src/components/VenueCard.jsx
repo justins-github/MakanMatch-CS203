@@ -152,6 +152,10 @@ const MOVE_WORDS = {
   down: (m) => `▼ down ${m.places} place${m.places === 1 ? '' : 's'}`,
 }
 
+// With the demo's Month switch on a later month: a place the first month didn't have,
+// or one that left and you said is still open.
+const MONTH_WORDS = { new: 'New to MakanMatch', reopened: "You said it's still open" }
+
 export default function VenueCard({ venue, index, open, onToggle, onReview, onOpenReviewer, move = null }) {
   const dots = CONFIDENCE_DOTS[venue.confidence]
   const reviewBomb = useReviewBomb()
@@ -183,6 +187,9 @@ export default function VenueCard({ venue, index, open, onToggle, onReview, onOp
         {fullAddress}
       </div>
       {move && <span className={`card-move ${move.kind}`}>{MOVE_WORDS[move.kind](move)}</span>}
+      {MONTH_WORDS[venue.monthChange] && (
+        <span className={`card-move${venue.monthChange === 'new' ? ' new' : ''}`}>{MONTH_WORDS[venue.monthChange]}</span>
+      )}
       {venue.hours ? (
         <div className="hours-line">{venue.hours.label}</div>
       ) : (

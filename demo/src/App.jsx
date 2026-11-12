@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
-import { getContext, getRecommendations, postReset, setLocation, warmServices } from './api/engineApi.js'
+import { useEffect, useRef, useState } from 'react'
+import {
+  getContext, getMonthChanges, getMonths, getRecommendations, postReset, setDemoMonth, setLocation, setReopened, warmServices,
+} from './api/engineApi.js'
 import { useAuth } from './auth/AuthContext.jsx'
 import { BottomNav, TopBar } from './components/AppNav.jsx'
 import ContextBanner from './components/ContextBanner.jsx'
@@ -7,11 +9,13 @@ import Feed from './components/Feed.jsx'
 import LocationPicker from './components/LocationPicker.jsx'
 import Login from './components/Login.jsx'
 import MakanPet, { useMakanPet } from './components/MakanPet.jsx'
+import MonthChanges from './components/MonthChanges.jsx'
 import Review from './components/Review.jsx'
 import ReviewerProfile from './components/reviews/ReviewerProfile.jsx'
 import DemoPanel from './components/DemoPanel.jsx'
 import { ReviewBombProvider } from './components/ReviewBomb.jsx'
 import { startKeepWarm } from './keepWarm.js'
+import { addStillOpen, latestOnly, searchScope } from './monthSwitch.js'
 import { movesBetween } from './rankMoves.js'
 import Splash from './components/Splash.jsx'
 import TasteDna from './components/TasteDna.jsx'
@@ -92,10 +96,22 @@ function SignedInApp() {
   const [demoVersion, setDemoVersion] = useState(0) // bumped when an admin's demo tool changes things
   const [rankBefore, setRankBefore] = useState(null) // the list's order before that change
   const [where, setWhere] = useState(loadWhere) // { lat, lon, label, source, walkMin }
+  // The Month switch (Demo controls): the months there are, the one loaded (null = the
+  // month we started from), gone places you said are still open, and the screen it stops on.
+  const [months, setMonths] = useState([])
+  const [month, setMonth] = useState(null)
+  const [stillOpen, setStillOpen] = useState([])
+  const [monthScreen, setMonthScreen] = useState(null) // { status: 'loading', text } | { status: 'ready', changes }
+  const monthRequests = useRef(latestOnly()) // so a slow answer can't land after a newer one, or after you've left
 
   // The Demo controls (rain and the rest) are an admin tool; viewing as a user or owner switches rain off.
   const canDemo = role === 'ADMIN'
   if (simRain && !canDemo) setSimRain(false)
+  if ((month || monthScreen) && !canDemo) {
+    setMonth(null)
+    setStillOpen([])
+    setMonthScreen(null)
+  }
 
   const changeWhere = (next) => {
     setWhere(next)
@@ -107,6 +123,21 @@ function SignedInApp() {
   useEffect(() => {
     setLocation(where)
   }, [where.lat, where.lon])
+
+  // Likewise, so they ask for the month that's loaded.
+  useEffect(() => {
+    setDemoMonth(month)
+    setReopened(stillOpen)
+  }, [month, stillOpen])
+
+  useEffect(() => {
+    if (!canDemo) return undefined
+    let cancelled = false
+    getMonths()
+      .then((r) => { if (!cancelled) setMonths(r.months) })
+      .catch(() => {}) // the Month row just says it's checking
+    return () => { cancelled = true }
+  }, [canDemo])
 
   // "Use where I am" sticks: if the browser lets us without asking, follow the user on open.
   useEffect(() => {
@@ -142,7 +173,7 @@ function SignedInApp() {
       })
       .catch((err) => { if (!cancelled) setError(err.message) })
     return () => { cancelled = true }
-  }, [me.id, role, mode, mood, simRain, exclude, company, party, tab, resetCount, where.lat, where.lon, where.walkMin, demoVersion])
+  }, [me.id, role, mode, mood, simRain, exclude, company, party, tab, resetCount, where.lat, where.lon, where.walkMin, demoVersion, month, stillOpen])
 
   const startMode = (next) => {
     setRecs(null)
@@ -160,6 +191,68 @@ function SignedInApp() {
     setRankBefore(recs?.venues.map((v) => v.id) ?? null)
     setDemoVersion((n) => n + 1)
   }
+  // The Month switch: a short refresh, then what changed since the month we started from
+  // (for a later month), then Find. Going back to the first month skips the screen. Find
+  // is fetched once, when the month changes (the effect above); the list's order from
+  // before is kept so the cards can say how they moved.
+  const showPicks = () => {
+    setReviewerId(null)
+    setTab('feed')
+    if (mode === 'idle') startMode('find')
+  }
+  const loadMonth = async (next) => {
+    const picked = months.find((m) => m.month === next)
+    if (!picked) return
+    const ticket = monthRequests.current.begin()
+    const first = months.find((m) => m.base)?.label ?? ''
+    setReviewerId(null)
+    setTab('feed')
+    setError(null)
+    setMonthScreen({
+      status: 'loading',
+      text: picked.base ? `Loading ${picked.label}…` : `Checking what changed since ${first.split(' ')[0]}…`,
+    })
+    const pause = new Promise((resolve) => setTimeout(resolve, picked.base ? 800 : 1200))
+    try {
+      const [changes] = await Promise.all([picked.base ? null : getMonthChanges(next, where.walkMin), pause])
+      if (!monthRequests.current.isCurrent(ticket)) return
+      setRankBefore(mode === 'find' ? recs?.venues.map((v) => v.id) ?? null : null)
+      // Together with the month, so Find is asked once: a fresh month starts with nothing reopened.
+      setStillOpen((ids) => (ids.length ? [] : ids))
+      setMonth(picked.base ? null : next)
+      if (picked.base) {
+        setMonthScreen(null)
+        showPicks()
+      } else {
+        setMonthScreen({ status: 'ready', changes })
+      }
+    } catch (err) {
+      if (!monthRequests.current.isCurrent(ticket)) return
+      setMonthScreen(null)
+      setError(err.message)
+    }
+  }
+  const leaveMonthScreen = () => {
+    monthRequests.current.cancel() // an "It's still open" answer still on its way must not bring the screen back
+    setMonthScreen(null)
+    showPicks()
+  }
+  // "It's still open": the place comes back for you, and drops off the change list.
+  const sayStillOpen = async (venueId) => {
+    const next = addStillOpen(stillOpen, venueId)
+    if (next === stillOpen) return
+    const ticket = monthRequests.current.begin()
+    setStillOpen(next)
+    try {
+      const changes = await getMonthChanges(month, where.walkMin, next)
+      if (monthRequests.current.isCurrent(ticket)) setMonthScreen({ status: 'ready', changes })
+    } catch (err) {
+      if (!monthRequests.current.isCurrent(ticket)) return
+      setMonthScreen(null)
+      setError(err.message)
+    }
+  }
+
   // Only Find's list has places to move; Surprise is one pick at a time.
   const moves = mode === 'find' && rankBefore && recs ? movesBetween(rankBefore, recs.venues) : null
 
@@ -241,6 +334,9 @@ function SignedInApp() {
             onNextDay={advanceDay}
             onResetPet={resetDaySimulator}
             onFindAgain={afterDemoChange}
+            months={months}
+            month={month}
+            onLoadMonth={loadMonth}
             onEditTaste={() => {
               setReviewerId(null)
               setEditingTaste(true)
@@ -266,7 +362,13 @@ function SignedInApp() {
           />
           <LocationPicker where={where} area={context?.area} onChange={changeWhere} />
           <MakanPet pet={pet} today={today} minimized={petMinimized} onToggleMinimized={togglePet} onCare={startPetReview} />
-          {error ? (
+          {monthScreen?.status === 'loading' ? (
+            <main className="feed">
+              <div className="loading">{monthScreen.text}</div>
+            </main>
+          ) : monthScreen ? (
+            <MonthChanges changes={monthScreen.changes} onStillOpen={sayStillOpen} onDone={leaveMonthScreen} />
+          ) : error ? (
             <main className="feed">
               <button className="back-link" onClick={backToLanding}>
                 ← Back
@@ -306,8 +408,9 @@ function SignedInApp() {
       {/* Stays mounted once opened, so an unfinished review survives a look at another tab. */}
       {reviewOpened && (
         <div className="tab-keep" hidden={tab !== 'rate'}>
+          {/* Remounts when the Month switch changes what search returns: its cache is per month. */}
           <Review
-            key={viewKey}
+            key={`${viewKey}-${searchScope(month, stillOpen)}`}
             active={tab === 'rate'}
             startVenue={reviewVenue}
             onReviewSaved={markReview}

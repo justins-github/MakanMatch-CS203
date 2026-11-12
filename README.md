@@ -416,7 +416,9 @@ cd context-service && ./mvnw test
 | `npm run seed:changes` | Mei reviews Turk's Kebab, then its owner changes prices and the menu, so her card shows "Since your last visit" (run after `seed:personas`) |
 | `npm run seed:review-bomb -- --prepare` | Give the spice-shy demo accounts their review history, and make Sam kakis with Hafiz and Mei (run after `seed:personas`) |
 | `npm run seed:review-bomb` | The review bomb from the command line (admins can also drop it from a place's card): three spice-shy accounts review Turk's Kebab as "SUPER SPICY". Safe to re-run, one place at a time. `--undo` takes it back wherever it was dropped, `--check` shows where the place stands for Sam, `--venue <id>` picks another place |
-| `node scripts/extract-overture.mjs` | Re-extract Singapore venues from the latest monthly Overture Maps release, then run `load:venues` |
+| `npm run seed:month-demo` | Add the dish the Month demo's "a place you loved has closed" moment needs. Safe to re-run |
+| `node scripts/extract-overture.mjs [release]` | Re-extract Singapore venues from an Overture Maps release (the latest by default), then run `load:venues`. This replaces the August base, so rebuild the month files after |
+| `node scripts/build-month.mjs <release>` | Compare an Overture release with the August base and write that month's differences for the demo's Month switch. Then run `embed-venues`, `upload:vectors` and `load:venues` |
 | `node scripts/embed-venues.mjs` | Rebuild the venue embeddings |
 | `node scripts/seed-accounts.mjs --promote <email>` | Make an account an admin |
 | `node scripts/seed-accounts.mjs --grant <email> <venueId>` | Let an account manage a venue without a claim (handy for testing) |

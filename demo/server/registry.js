@@ -1,4 +1,5 @@
-// Venue registry: Overture rows merged with the curated seeds, built once at startup.
+// Venue registry: Overture rows merged with the curated seeds, built once at startup
+// (per month: see months.js).
 
 import { readFileSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
@@ -74,8 +75,8 @@ export function buildRegistry(overtureRows, seeds, now = Date.now()) {
   }
 }
 
-// Loads the seeds and the Overture snapshot from disk.
-export function loadRegistry() {
+// The seeds and the Overture snapshot as they are on disk.
+export function loadRegistryInputs() {
   const here = dirname(fileURLToPath(import.meta.url))
   const seeds = JSON.parse(readFileSync(join(here, 'data', 'venues.json'), 'utf8'))
   const overturePath = join(here, 'data', 'sg_food_places.json')
@@ -85,9 +86,5 @@ export function loadRegistry() {
   } else {
     console.warn('sg_food_places.json missing - run `node scripts/extract-overture.mjs`; serving seeds only')
   }
-  const registry = buildRegistry(overtureRows, seeds)
-  const { total, overture, unmatched } = registry.stats
-  console.log(`venue registry: ${total} venues (${overture} from Overture)`)
-  if (unmatched.length) console.log(`community-only seeds (no Overture match): ${unmatched.join(', ')}`)
-  return registry
+  return { overtureRows, seeds }
 }

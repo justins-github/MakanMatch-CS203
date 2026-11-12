@@ -145,6 +145,17 @@
   gap: 6px;
 }
 
+.demo-select {
+  max-width: 132px;
+  border: 1.5px solid var(--ink);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  padding: 4px 6px;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+}
+
 .demo-row-actions .btn {
   padding: 5px 11px;
   border-width: 1.5px;
