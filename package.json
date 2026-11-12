@@ -12,6 +12,7 @@
     "simulate": "node scripts/seed-community.mjs",
     "seed:changes": "node scripts/seed-changes.mjs",
     "seed:review-bomb": "node scripts/seed-review-bomb.mjs",
+    "seed:month-demo": "node scripts/seed-month-demo.mjs",
     "postinstall": "cd demo && npm install"
   },
   "devDependencies": {

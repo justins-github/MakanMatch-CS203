@@ -525,6 +525,101 @@ body {
   color: var(--chili);
 }
 
+/* What changed since the first month (MonthChanges.jsx, the demo's Month switch). */
+.month-title {
+  margin: 4px 0 2px;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1.15;
+}
+
+.month-note,
+.month-more,
+.month-totals {
+  margin: 0;
+  font-family: var(--font-data);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.month-more {
+  padding: 8px 0 0 62px;
+}
+
+.month-totals {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #e6dfd1;
+}
+
+.month-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid #e6dfd1;
+  font-size: 13px;
+}
+
+.month-row-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.month-row-name {
+  font-weight: 600;
+  font-size: 14.5px;
+}
+
+.month-row-where,
+.month-row-next {
+  color: var(--ink-soft);
+}
+
+.month-tag {
+  flex: none;
+  width: 52px;
+  margin-top: 2px;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  font-family: var(--font-data);
+  font-size: 10.5px;
+  line-height: 1.7;
+  text-align: center;
+}
+
+.month-tag.closed {
+  border-color: var(--chili);
+  background: var(--chili);
+  color: var(--paper);
+}
+
+.month-tag.gone {
+  background: var(--kunyit);
+}
+
+.month-tag.new {
+  border-color: var(--pandan);
+  background: var(--pandan);
+  color: var(--paper);
+}
+
+.month-still-open {
+  margin-top: 7px;
+  padding: 4px 10px;
+  border-width: 1.5px;
+  font-size: 12px;
+}
+
+.month-done {
+  display: block;
+  width: 100%;
+  margin-top: 16px;
+  padding: 11px 13px;
+  font-size: 15px;
+}
+
 .feed {
   flex: 1;
   padding: 16px 18px 96px;

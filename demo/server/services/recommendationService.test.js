@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { starterProfile } from '../learn.js'
 import { memoryLearnerStore } from './learnerStore.js'
 import { buildSearchIndex } from '../search.js'
+import { createMonths } from '../months.js'
 import { createRecommendationService } from './recommendationService.js'
 
 // All a short walk north of SMU (1.2966, 103.85): 5, 9, 7 and 6 minutes.
@@ -19,7 +20,7 @@ const MONDAY_8PM = new Date('2026-09-28T20:00:00+08:00')
 
 const diner = { id: '88888888-8888-8888-8888-888888888888', me: { displayName: 'Mei', ownedVenues: [] } }
 
-function service({ hours = new Map(), hoursDown = false, venues = [TURKS, YANGON], kakis = [], people, changes, statuses = new Map(), prices = new Map(), explainer, clock = () => MONDAY_8PM, learners = memoryLearnerStore({ starter: starterProfile }), vectors = { size: 0 } } = {}) {
+function service({ hours = new Map(), hoursDown = false, venues = [TURKS, YANGON], kakis = [], people, changes, statuses = new Map(), prices = new Map(), explainer, clock = () => MONDAY_8PM, learners = memoryLearnerStore({ starter: starterProfile }), vectors = { size: 0 }, months } = {}) {
   const catalog = {
     venueStatuses: async () => statuses,
     venuePrices: async () => prices,
@@ -39,6 +40,7 @@ function service({ hours = new Map(), hoursDown = false, venues = [TURKS, YANGON
   }
   return createRecommendationService({
     registry: registryOf(venues),
+    months,
     vectors,
     learners,
     catalog,
@@ -617,4 +619,203 @@ test('at most three places are listed as dropped, biggest drop first', async () 
   const result = await find(service({ learners, venues: [...places, ...rivals(10)], people: names }))
   assert.equal(result.droppedByReviews.length, 3)
   assert.deepEqual(result.droppedByReviews.slice(0, 2).map((v) => v.id), ['three-reviews', 'two-reviews'])
+})
+
+// The demo's Month switch. Juice Bar is closed in October and Pau Shop merely unlisted;
+// Anatolia Grill is new. All a short walk north of SMU: 5, 6, 7 and 9 minutes.
+const ovRow = (gersId, name, lat) => ({ gersId, name, lat, lon: 103.85, categoryPrimary: 'cafe', categoryPath: [], confidence: 0.9, updatedAt: '2026-08-14T00:00:00Z' })
+const octMonths = () => createMonths({
+  overtureRows: [ovRow('juice', 'Juice Bar', 1.3002), ovRow('pau', 'Pau Shop', 1.3009), ovRow('soto', 'Soto Corner', 1.3016)],
+  seeds: [],
+  deltas: [{
+    month: '2026-10', label: 'October 2026', release: 'r', base: '2026-08',
+    gone: [{ gersId: 'juice', reason: 'closed' }, { gersId: 'pau', reason: 'unlisted' }],
+    added: [ovRow('grill', 'Anatolia Grill', 1.3031)],
+  }],
+})
+const monthService = (options = {}) => {
+  const months = octMonths()
+  return service({ venues: months.base.venues, months, ...options })
+}
+const venueNames = (result) => result.venues.map((v) => v.name).sort()
+const findIn = (recs, extra) => recs.recommend(diner, { mode: 'find', mood: null, context: { raining: false }, ...extra })
+
+test('Find on August is unchanged when no month is asked for', async () => {
+  assert.deepEqual(venueNames(await find(monthService())), ['Juice Bar', 'Pau Shop', 'Soto Corner'])
+})
+
+test('Find on October drops gone places and tags new ones', async () => {
+  const result = await findIn(monthService(), { month: '2026-10' })
+  assert.deepEqual(venueNames(result), ['Anatolia Grill', 'Soto Corner'])
+  assert.equal(result.venues.find((v) => v.name === 'Anatolia Grill').monthChange, 'new')
+})
+
+test('a place the diner says is still open comes back, tagged', async () => {
+  const result = await findIn(monthService(), { month: '2026-10', reopened: ['ov-pau', 'not-a-ghost'] })
+  assert.deepEqual(venueNames(result), ['Anatolia Grill', 'Pau Shop', 'Soto Corner'])
+  assert.equal(result.venues.find((v) => v.name === 'Pau Shop').monthChange, 'reopened')
+})
+
+test('October search tags gone and new places instead of hiding them', async () => {
+  const recs = monthService()
+  const first = async (q, opts) => (await recs.search(diner, q, 8, undefined, { month: '2026-10', ...opts }))[0]
+  assert.deepEqual([(await first('juice')).change, (await first('juice')).matchScore], ['closed', null])
+  assert.equal((await first('pau')).change, 'unlisted')
+  assert.equal((await first('anatolia')).change, 'new')
+  assert.equal((await first('soto')).change, null)
+  assert.equal((await first('pau', { reopened: ['ov-pau'] })).change, 'reopened')
+  assert.equal(typeof (await first('pau', { reopened: ['ov-pau'] })).matchScore, 'number')
+})
+
+test('August search has no tags and no October-only places', async () => {
+  const recs = monthService()
+  assert.equal((await recs.search(diner, 'juice', 8))[0].change, null)
+  assert.deepEqual(await recs.search(diner, 'anatolia', 8), [])
+})
+
+const reviewAt = (learners, who, venueId, score10) => learners.update(who.id, who.me.displayName, async (state) => {
+  state.reviews.push({ dishId: `${venueId}-dish`, dishName: 'Tunacado sandwich', venueId, rating: 5, score10, at: '2026-09-01T04:00:00.000Z' })
+  return { result: null }
+})
+const lovedJuiceBar = async () => {
+  const learners = memoryLearnerStore({ starter: starterProfile })
+  await reviewAt(learners, diner, 'ov-juice', 9)
+  return learners
+}
+const changesIn = (recs, opts = {}) => recs.monthChanges(diner, { month: '2026-10', ...opts })
+
+test('the base month has no changes to report', async () => {
+  assert.equal(await monthService().monthChanges(diner, { month: '2026-08' }), null)
+})
+
+test('nearby changes: closed before unlisted, new places scored for this diner', async () => {
+  const c = await changesIn(monthService())
+  assert.deepEqual([c.label, c.since], ['October 2026', 'August 2026'])
+  assert.deepEqual(c.yours, [])
+  assert.deepEqual(c.gone.map((g) => [g.name, g.reason]), [['Juice Bar', 'closed'], ['Pau Shop', 'unlisted']])
+  assert.deepEqual(c.added.map((a) => a.name), ['Anatolia Grill'])
+  assert.equal(typeof c.added[0].matchScore, 'number')
+  assert.equal(typeof c.added[0].distanceMin, 'number')
+  assert.deepEqual([c.nearby, c.totals], [{ gone: 2, added: 1 }, { gone: 2, added: 1 }])
+})
+
+test('a gone place you reviewed leads, with your score, and is not repeated below', async () => {
+  const c = await changesIn(monthService({ learners: await lovedJuiceBar() }))
+  assert.deepEqual(c.yours.map((y) => [y.name, y.reason, y.yourScore]), [['Juice Bar', 'closed', 9]])
+  assert.deepEqual(c.gone.map((g) => g.name), ['Pau Shop'])
+  assert.equal(c.nearby.gone, 1)
+})
+
+test('the replacement is the nearby October place closest in taste to the one that went', async () => {
+  const vec = { juice: [1, 0], grill: [0.9, 0.1], soto: [0, 1] }
+  const vectors = {
+    size: 3,
+    vectorsFor: async (ids) => new Map(ids.filter((id) => vec[id]).map((id) => [id, Float32Array.from(vec[id])])),
+    similarities: async (ids, v) => new Map(ids.filter((id) => vec[id]).map((id) => [id, vec[id][0] * v[0] + vec[id][1] * v[1]])),
+  }
+  const c = await changesIn(monthService({ learners: await lovedJuiceBar(), vectors }))
+  assert.equal(c.yours[0].replacement.name, 'Anatolia Grill')
+  assert.equal(typeof c.yours[0].replacement.matchScore, 'number')
+  assert.equal(typeof c.yours[0].replacement.distanceMin, 'number')
+})
+
+test('without embeddings there is simply no replacement', async () => {
+  const c = await changesIn(monthService({ learners: await lovedJuiceBar() }))
+  assert.equal(c.yours[0].replacement, null)
+})
+
+test('a place you said is still open is no longer reported gone', async () => {
+  const c = await changesIn(monthService(), { reopened: ['ov-pau'] })
+  assert.deepEqual(c.gone.map((g) => g.name), ['Juice Bar'])
+  assert.equal(c.nearby.gone, 1)
+})
+
+test('a shorter walk reports fewer nearby changes but the same totals', async () => {
+  const c = await changesIn(monthService(), { walkMin: 6 })
+  assert.deepEqual(c.added, []) // Anatolia Grill is 9 minutes away
+  assert.deepEqual(c.totals, { gone: 2, added: 1 })
+})
+
+test('a new place that breaks your dietary needs is not offered', async () => {
+  const halal = { ...diner, me: { ...diner.me, dietary: { restrictions: ['HALAL'] } } }
+  const c = await monthService().monthChanges(halal, { month: '2026-10' })
+  assert.deepEqual(c.added, [])
+  assert.equal(c.nearby.added, 0)
+})
+
+test('a place said to be still open twice still comes back once', async () => {
+  const result = await findIn(monthService(), { month: '2026-10', reopened: ['ov-pau', 'ov-pau'] })
+  assert.deepEqual(venueNames(result), ['Anatolia Grill', 'Pau Shop', 'Soto Corner'])
+})
+
+test('a gone place keeps its place in search, so a short query still finds it', async () => {
+  // Juice Bar (5 min away) outranks Juice Corner (over an hour's walk) for this diner.
+  const months = createMonths({
+    overtureRows: [ovRow('juice', 'Juice Bar', 1.3002), ovRow('corner', 'Juice Corner', 1.36)],
+    seeds: [],
+    deltas: [{ month: '2026-10', label: 'October 2026', release: 'r', base: '2026-08', gone: [{ gersId: 'juice', reason: 'closed' }], added: [] }],
+  })
+  const recs = service({ venues: months.base.venues, months })
+  assert.deepEqual((await recs.search(diner, 'juice', 2)).map((r) => r.name), ['Juice Bar', 'Juice Corner'])
+  const [top] = await recs.search(diner, 'juice', 1, undefined, { month: '2026-10' })
+  assert.deepEqual([top.name, top.change, top.matchScore], ['Juice Bar', 'closed', null])
+})
+
+// The line above the picks on a later month: what the month did to this diner's list.
+const monthsWith = ({ rows, gone = [], added = [] }) => createMonths({
+  overtureRows: rows, seeds: [],
+  deltas: [{ month: '2026-10', label: 'October 2026', release: 'r', base: '2026-08', gone, added }],
+})
+const octFind = (months, extra = {}) => service({ venues: months.base.venues, months }).recommend(diner, { mode: 'find', mood: null, context: { raining: false }, month: '2026-10', ...extra })
+
+test('Find on a later month says which of your picks left and how many new ones made it in', async () => {
+  const { month } = await findIn(monthService(), { month: '2026-10' })
+  assert.deepEqual([month.label, month.since, month.arrived], ['October 2026', 'August 2026', 1])
+  assert.deepEqual(month.left.map((v) => [v.id, v.name, v.reason]).sort(), [['ov-juice', 'Juice Bar', 'closed'], ['ov-pau', 'Pau Shop', 'unlisted']])
+})
+
+test('when nothing near you changed, the picks are the same and it says so', async () => {
+  // What left and what arrived are both over an hour's walk away.
+  const months = monthsWith({
+    rows: [ovRow('soto', 'Soto Corner', 1.3016), ovRow('far', 'Far Cafe', 1.36)],
+    gone: [{ gersId: 'far', reason: 'closed' }],
+    added: [ovRow('farnew', 'Far New Cafe', 1.37)],
+  })
+  const result = await octFind(months)
+  assert.deepEqual(result.venues.map((v) => v.name), ['Soto Corner'])
+  assert.deepEqual([result.month.left, result.month.arrived], [[], 0])
+})
+
+test('a pick that stopped being a food place counts as left, though it is never listed as a change', async () => {
+  const months = monthsWith({
+    rows: [ovRow('soto', 'Soto Corner', 1.3016), ovRow('mall', 'The Mall', 1.3002)],
+    gone: [{ gersId: 'mall', reason: 'dropped' }],
+  })
+  const { month } = await octFind(months)
+  assert.deepEqual(month.left, [{ id: 'ov-mall', name: 'The Mall', reason: 'dropped' }])
+})
+
+test('a place you said is still open has not left your picks', async () => {
+  const { month } = await findIn(monthService(), { month: '2026-10', reopened: ['ov-pau'] })
+  assert.deepEqual(month.left.map((v) => v.name), ['Juice Bar'])
+})
+
+test('a gone place that never made your top 10 has not left your picks', async () => {
+  // Ten places a few minutes away, and one that closed 19 minutes away: it was 11th.
+  const near = Array.from({ length: 10 }, (_, i) => ovRow(`near${i}`, `Near Cafe ${i}`, 1.2975 + i * 0.0001))
+  const months = monthsWith({ rows: [...near, ovRow('edge', 'Edge Cafe', 1.3063)], gone: [{ gersId: 'edge', reason: 'closed' }] })
+  const august = await service({ venues: months.base.venues, months }).recommend(diner, { mode: 'find', mood: null, context: { raining: false } })
+  assert.equal(august.venues.some((v) => v.name === 'Edge Cafe'), false, 'the fixture needs Edge Cafe outside the August top 10')
+  const { month } = await octFind(months)
+  assert.deepEqual(month.left, [])
+})
+
+test('Surprise on a later month only says which month it is', async () => {
+  const result = await monthService().recommend(diner, { mode: 'surprise', mood: null, context: { raining: false }, month: '2026-10' })
+  assert.deepEqual(result.month, { label: 'October 2026', since: 'August 2026' })
+})
+
+test('on the first month there is no month line', async () => {
+  assert.equal((await find(monthService())).month, undefined)
+  assert.equal((await findIn(monthService(), { month: '2026-08' })).month, undefined)
 })

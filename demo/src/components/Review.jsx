@@ -3,6 +3,14 @@ import { addDish as addCatalogDish } from '../api/catalogApi.js'
 import { getProfile, getRankings, getVenueDishes, postBeliReview, searchVenues, undoReview } from '../api/engineApi.js'
 import { answerDuel, currentOpponent, startDuel } from '../duel.js'
 
+// With the demo's Month switch on a later month: what happened to a place since the first.
+const MONTH_PILL = {
+  closed: ['Closed', 'rejected'],
+  unlisted: ['No longer listed', 'pending'],
+  new: ['New', 'approved'],
+  reopened: ["You said it's still open", 'quiet'],
+}
+
 // Venue name with the server-computed match ranges bolded.
 function HighlightedName({ name, highlight }) {
   if (!highlight?.length) return name
@@ -398,7 +406,8 @@ export default function Review({ active = true, startVenue = null, onReviewSaved
                     </span>
                   </span>
                   <span className="venue-row-scores">
-                    <span className="pill ai">AI {r.matchScore}%</span>
+                    {MONTH_PILL[r.change] && <span className={`pill ${MONTH_PILL[r.change][1]}`}>{MONTH_PILL[r.change][0]}</span>}
+                    {r.matchScore != null && <span className="pill ai">AI {r.matchScore}%</span>}
                     {r.yourScore != null && <span className="pill you">You {r.yourScore}</span>}
                   </span>
                 </button>

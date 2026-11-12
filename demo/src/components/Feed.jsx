@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { monthNote } from '../monthSwitch.js'
 import VenueCard from './VenueCard.jsx'
 
 const MOOD_NOTES = {
@@ -138,6 +139,8 @@ export default function Feed({ mode, data, onFind, onSurprise, onAnother, onPrev
       <button className="back-link" onClick={onBack}>
         ← {data.group ? "Who's coming" : 'Back'}
       </button>
+      {/* The demo's Month switch: which month this is, and what it did to your picks. */}
+      {data.month && <div className="rerank-note">{monthNote(data.month)}</div>}
       <GroupNote group={data.group} />
       {MOOD_NOTES[data.mood] && <div className="rerank-note">{MOOD_NOTES[data.mood]}</div>}
       <DietaryNote dietary={data.dietary} group={data.group} />

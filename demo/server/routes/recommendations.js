@@ -1,8 +1,10 @@
 // For You: top-10 matches within a walk of where the caller is (X-Location, ?walk=),
 // or one experimental Surprise pick - for the caller alone, or with kakis (?with=id,id).
+// ?month= and ?reopen= are the demo's Month switch (demoMonths.js).
 import { Router } from 'express'
 import { asyncHandler, badRequest } from '../errors.js'
 import { withRainOverride } from '../weather.js'
+import { monthOf, reopenedOf } from './demoMonths.js'
 import { locationOf, walkLimitOf } from './location.js'
 
 const MOODS = ['none', 'soupy', 'spicy', 'light']
@@ -18,7 +20,7 @@ function kakiIds(param, selfId) {
   return ids
 }
 
-export function recommendationRoutes({ recommendations, getContext }) {
+export function recommendationRoutes({ recommendations, getContext, months }) {
   const router = Router()
 
   router.get('/api/recommendations', asyncHandler(async (req, res) => {
@@ -29,7 +31,9 @@ export function recommendationRoutes({ recommendations, getContext }) {
     const from = locationOf(req)
     const walkMin = walkLimitOf(req)
     const context = withRainOverride(await getContext(from), req.query.rain === '1')
-    res.json(await recommendations.recommend(req.user, { mode, mood, context, exclude, withIds, from, walkMin }))
+    const month = monthOf(req, months) // the demo's Month switch
+    const reopened = reopenedOf(req)
+    res.json(await recommendations.recommend(req.user, { mode, mood, context, exclude, withIds, from, walkMin, month, reopened }))
   }))
 
   return router

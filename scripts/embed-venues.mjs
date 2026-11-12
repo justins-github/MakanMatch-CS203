@@ -1,4 +1,5 @@
-// Builds prior taste vectors for every venue in demo/server/data/sg_food_places.json.
+// Builds prior taste vectors for every venue in demo/server/data/sg_food_places.json,
+// and for the places later months add (data/months/, the demo's Month switch).
 //
 //   node scripts/embed-venues.mjs
 //
@@ -13,6 +14,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { pipeline, env } from '@huggingface/transformers'
 import { describeVenue } from '../demo/server/cuisines.js'
+import { loadMonthFiles } from '../demo/server/months.js'
 import { quantise, createStore } from '../demo/server/vectors.js'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -23,8 +25,13 @@ const BATCH = 64
 
 env.cacheDir = join(root, 'node_modules', '.cache', 'transformers')
 
-const venues = JSON.parse(readFileSync(join(dataDir, 'sg_food_places.json'), 'utf8'))
-console.log(`embedding ${venues.length} venues with ${MODEL}`)
+// The base rows first, exactly as before, so their vectors don't change; then each
+// later month's new places.
+const base = JSON.parse(readFileSync(join(dataDir, 'sg_food_places.json'), 'utf8'))
+const seen = new Set(base.map((v) => v.gersId))
+const later = loadMonthFiles(dataDir).flatMap((month) => month.added).filter((v) => !seen.has(v.gersId) && seen.add(v.gersId))
+const venues = [...base, ...later]
+console.log(`embedding ${venues.length} venues with ${MODEL} (${later.length} from later months)`)
 
 const t0 = Date.now()
 const embed = await pipeline('feature-extraction', MODEL, { dtype: 'q8' })

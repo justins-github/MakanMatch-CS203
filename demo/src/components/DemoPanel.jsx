@@ -7,8 +7,8 @@ import './demo-panel.css'
 
 // An admin's demo controls, behind one "Demo" button in the top bar, on a screen of their
 // own: the outside world (rain, the review bomb - dropped from a restaurant's card, taken
-// back here or there), your taste (edited on the Taste DNA tab) and time (Makan Pet's
-// days). What changes Find closes the screen and runs Find again (onFindAgain), so the
+// back here or there), your taste (edited on the Taste DNA tab) and time (which month of
+// Singapore's places is loaded, and Makan Pet's days). What changes Find closes the screen and runs Find again (onFindAgain), so the
 // room sees the list move. The button counts what's switched on, so nothing is left on
 // after a rehearsal.
 
@@ -40,13 +40,41 @@ function ReviewBombRow({ onUndone }) {
   )
 }
 
-export default function DemoPanel({ simRain, onToggleRain, today, simulator, onNextDay, onResetPet, onFindAgain, onEditTaste }) {
+// Which month of Singapore's places is loaded. Loading a later one stops on what changed
+// since the first (MonthChanges.jsx) before Find runs again; only this browser sees it.
+function MonthRow({ months, month, onLoad }) {
+  const [picked, setPicked] = useState(null) // what the dropdown shows, until it's loaded
+  const loaded = months.find((m) => (month ? m.month === month : m.base))
+  if (months.length < 2) {
+    return <DemoRow title="Month" state={months.length === 1 ? `Only ${months[0].label} is available.` : 'Checking…'} />
+  }
+  const choice = picked ?? loaded?.month ?? months[0].month
+  return (
+    <DemoRow title="Month" on={Boolean(month)} state={`Showing Singapore as of ${loaded?.label ?? months[0].label}.`}>
+      <select className="demo-select" aria-label="Month to load" value={choice} onChange={(e) => setPicked(e.target.value)}>
+        {months.map((m) => <option key={m.month} value={m.month}>{m.label}</option>)}
+      </select>
+      <button
+        type="button"
+        className="btn go"
+        onClick={() => {
+          setPicked(null)
+          onLoad(choice)
+        }}
+      >
+        Load
+      </button>
+    </DemoRow>
+  )
+}
+
+export default function DemoPanel({ simRain, onToggleRain, today, simulator, onNextDay, onResetPet, onFindAgain, onEditTaste, months = [], month = null, onLoadMonth }) {
   const [open, setOpen] = useState(false)
   const reviewBomb = useReviewBomb()
   const [byHand, setByHand] = useState(null) // is your taste set by hand right now?
   const doneRef = useRef(null)
   const testDays = simulator.offset
-  const on = [simRain, reviewBomb?.on, testDays > 0].filter(Boolean).length
+  const on = [simRain, reviewBomb?.on, testDays > 0, Boolean(month)].filter(Boolean).length
 
   useEffect(() => {
     if (!open) return undefined
@@ -117,6 +145,14 @@ export default function DemoPanel({ simRain, onToggleRain, today, simulator, onN
         </DemoRow>
 
         <h3 className="demo-section">Time</h3>
+        <MonthRow
+          months={months}
+          month={month}
+          onLoad={(next) => {
+            setOpen(false)
+            onLoadMonth(next)
+          }}
+        />
         <DemoRow
           title="Makan Pet"
           on={testDays > 0}
