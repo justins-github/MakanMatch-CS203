@@ -6,7 +6,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,22 +44,20 @@ public class AccountClient {
 	private final String target;
 	private final Map<String, Cached> cache = new ConcurrentHashMap<>();
 
-	public AccountClient(@Value("${account-service.url}") String accountServiceUrl) {
+	public AccountClient(@Value("${account-service.url}") String accountServiceUrl,
+			@Value("${account-service.ca-bundle:}") String caBundle) {
 		// HTTP/1.1, as the engine speaks to the same service: left alone, this client asks
 		// every plain-HTTP server to switch to HTTP/2 first.
-		JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
-				.version(HttpClient.Version.HTTP_1_1).connectTimeout(COLD_START_WAIT).build());
+		HttpClient.Builder client = HttpClient.newBuilder()
+				.version(HttpClient.Version.HTTP_1_1).connectTimeout(COLD_START_WAIT);
+		// On Vercel the address is HTTPS behind Vercel's own certificate authority.
+		PlatformCertificates.trusting(caBundle).ifPresent(client::sslContext);
+		JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(client.build());
 		factory.setReadTimeout(COLD_START_WAIT);
 		this.http = RestClient.builder().baseUrl(accountServiceUrl).requestFactory(factory).build();
 		this.clock = Clock.systemUTC();
 		this.target = schemeAndHost(accountServiceUrl);
 		log.info("account-service: {}", target);
-		// Temporary, while calls to account-service fail on Vercel: the engine (Node) gets
-		// through and this service doesn't, and Java ignores the proxy and certificate
-		// settings Node picks up from the environment. Names only, never values.
-		log.info("proxy and certificate settings in the environment: {}", System.getenv().keySet().stream()
-				.filter(name -> name.toUpperCase(Locale.ROOT).matches(".*(PROXY|CERT|SSL|CA_BUNDLE).*"))
-				.sorted().toList());
 	}
 
 	/** Where calls go, for the log: no path or query, in case the address carries a secret. */
