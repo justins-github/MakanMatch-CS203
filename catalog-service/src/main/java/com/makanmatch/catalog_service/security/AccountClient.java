@@ -1,14 +1,18 @@
 package com.makanmatch.catalog_service.security;
 
+import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -34,16 +38,40 @@ public class AccountClient {
 	// 503. Matches the engine's wait (demo/server/clients/accountClient.js).
 	private static final Duration COLD_START_WAIT = Duration.ofSeconds(25);
 
+	private static final Logger log = LoggerFactory.getLogger(AccountClient.class);
+
 	private final RestClient http;
 	private final Clock clock;
+	private final String target;
 	private final Map<String, Cached> cache = new ConcurrentHashMap<>();
 
 	public AccountClient(@Value("${account-service.url}") String accountServiceUrl) {
-		JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(
-				HttpClient.newBuilder().connectTimeout(COLD_START_WAIT).build());
+		// HTTP/1.1, as the engine speaks to the same service: left alone, this client asks
+		// every plain-HTTP server to switch to HTTP/2 first.
+		JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
+				.version(HttpClient.Version.HTTP_1_1).connectTimeout(COLD_START_WAIT).build());
 		factory.setReadTimeout(COLD_START_WAIT);
 		this.http = RestClient.builder().baseUrl(accountServiceUrl).requestFactory(factory).build();
 		this.clock = Clock.systemUTC();
+		this.target = schemeAndHost(accountServiceUrl);
+		log.info("account-service: {}", target);
+		// Temporary, while calls to account-service fail on Vercel: the engine (Node) gets
+		// through and this service doesn't, and Java ignores the proxy and certificate
+		// settings Node picks up from the environment. Names only, never values.
+		log.info("proxy and certificate settings in the environment: {}", System.getenv().keySet().stream()
+				.filter(name -> name.toUpperCase(Locale.ROOT).matches(".*(PROXY|CERT|SSL|CA_BUNDLE).*"))
+				.sorted().toList());
+	}
+
+	/** Where calls go, for the log: no path or query, in case the address carries a secret. */
+	private static String schemeAndHost(String url) {
+		try {
+			URI uri = URI.create(url);
+			return uri.getScheme() + "://" + uri.getHost() + (uri.getPort() < 0 ? "" : ":" + uri.getPort());
+		}
+		catch (IllegalArgumentException e) {
+			return "(an address that isn't a URL)";
+		}
 	}
 
 	/** The caller's account as account-service sees it; empty when it rejects the token. */
@@ -70,12 +98,16 @@ public class AccountClient {
 						int status = response.getStatusCode().value();
 						if (status == 401 || status == 403) return Optional.<Me>empty();
 						if (response.getStatusCode().isError()) {
+							log.warn("account-service at {} answered {}", target, status);
 							throw new UpstreamUnavailableException("Account service answered " + status);
 						}
 						return Optional.ofNullable(response.bodyTo(Me.class));
 					});
 		}
 		catch (ResourceAccessException e) {
+			// The caller only sees "unreachable"; the reason (refused, timed out, TLS,
+			// unknown host) is here.
+			log.warn("account-service at {} could not be reached", target, e);
 			throw new UpstreamUnavailableException("Account service is unreachable");
 		}
 	}
