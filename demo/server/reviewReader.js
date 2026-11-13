@@ -5,6 +5,7 @@
 // where each signal is { dimension, direction, strength 1-3, quote, why } and a
 // cuisine signal also says which cuisine. Claude only suggests: every quote must really
 // be in the review, and learn.js decides how far the profile moves. read() never throws.
+
 import { CUISINES } from './cuisines.js'
 import { keywordReading } from './reviewText.js'
 
