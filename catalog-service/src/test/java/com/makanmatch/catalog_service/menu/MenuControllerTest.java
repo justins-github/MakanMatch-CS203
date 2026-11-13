@@ -3,6 +3,8 @@ package com.makanmatch.catalog_service.menu;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -14,6 +16,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -23,9 +26,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.makanmatch.catalog_service.common.ApiExceptionHandler;
+import com.makanmatch.catalog_service.common.UpstreamUnavailableException;
 import com.makanmatch.catalog_service.config.SecurityConfig;
 import com.makanmatch.catalog_service.menu.dto.DishResponse;
 import com.makanmatch.catalog_service.menu.dto.VenuePriceResponse;
+import com.makanmatch.catalog_service.security.AccountClient;
 import com.makanmatch.catalog_service.security.Caller;
 
 @WebMvcTest(MenuController.class)
@@ -39,6 +44,8 @@ class MenuControllerTest {
 
 	@MockitoBean
 	MenuService menus;
+	@MockitoBean
+	AccountClient accounts;
 	@MockitoBean
 	JwtDecoder jwtDecoder;
 
@@ -71,6 +78,47 @@ class MenuControllerTest {
 				.contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Lamb shish\"}"))
 				.andExpect(status().isCreated())
 				.andExpect(jsonPath("$.source").value("DINER"));
+	}
+
+	// A write runs in a database transaction and the service has three connections, so
+	// the wait for account-service has to be over before the write starts.
+	@Test
+	void aWriteLooksTheCallerUpBeforeItStarts() throws Exception {
+		Caller caller = new Caller(USER, "token-value", "user");
+		given(menus.create(eq("turks-kebab"), any(), eq(caller))).willReturn(new DishResponse("d2", "turks-kebab",
+				"Lamb shish", ReportSource.DINER, false, null, null, null, false, null));
+
+		mvc.perform(post("/api/catalog/venues/turks-kebab/dishes")
+				.with(jwt().jwt(token -> token.subject(USER.toString()).tokenValue("token-value")))
+				.header("X-Act-As", "user")
+				.contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Lamb shish\"}"))
+				.andExpect(status().isCreated());
+
+		InOrder order = inOrder(accounts, menus);
+		order.verify(accounts).me(caller);
+		order.verify(menus).create(eq("turks-kebab"), any(), eq(caller));
+	}
+
+	@Test
+	void aWriteIsTurnedAwayBeforeItStartsWhenAccountServiceCannotBeReached() throws Exception {
+		given(accounts.me(any())).willThrow(new UpstreamUnavailableException("Account service is unreachable"));
+
+		mvc.perform(post("/api/catalog/venues/turks-kebab/dishes")
+				.with(jwt().jwt(token -> token.subject(USER.toString()).tokenValue("token-value")))
+				.contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Lamb shish\"}"))
+				.andExpect(status().isServiceUnavailable())
+				.andExpect(jsonPath("$.detail").value("Account service is unreachable"));
+
+		verifyNoInteractions(menus);
+	}
+
+	@Test
+	void readsAskNothingOfAccountService() throws Exception {
+		mvc.perform(get("/api/catalog/venues/turks-kebab/dishes")
+				.with(jwt().jwt(token -> token.subject(USER.toString()).tokenValue("token-value"))))
+				.andExpect(status().isOk());
+
+		verifyNoInteractions(accounts);
 	}
 
 	@Test

@@ -71,6 +71,9 @@ public class AuthService {
 			return supabase.refresh(refreshToken);
 		}
 		catch (SupabaseAuthException e) {
+			// Supabase being busy says nothing about the session, so this must not be
+			// the UnauthorizedException that makes the controller clear the cookie.
+			if (e.status() == 429) throw new BadRequestException("Too many requests - wait a minute and try again");
 			if (e.isClientError()) throw new UnauthorizedException("Your session has ended - please sign in again");
 			throw e;
 		}

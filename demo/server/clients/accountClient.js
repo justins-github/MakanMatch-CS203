@@ -38,11 +38,12 @@ export function createAccountClient({
     },
 
     // The caller's MeResponse, or null when account-service rejects the token
-    // (expired, or the account was disabled).
-    async me(token, actAs = null) {
+    // (expired, or the account was disabled). `fresh` skips the kept answer, for
+    // callers that must not act on details the person changed a moment ago.
+    async me(token, actAs = null, { fresh = false } = {}) {
       const key = `${token}|${actAs ?? ''}`
       const hit = cache.get(key)
-      if (hit && hit.until > now()) return hit.value
+      if (!fresh && hit && hit.until > now()) return hit.value
 
       let res
       try {

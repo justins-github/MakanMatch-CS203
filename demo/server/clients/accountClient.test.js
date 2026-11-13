@@ -90,6 +90,17 @@ for (const [name, call] of [['me', (c) => c.me('t')], ['kakis', (c) => c.kakis('
   })
 }
 
+test('me: the answer is kept for a burst of requests, but a fresh ask goes to account-service again', async () => {
+  let dietary = []
+  const { client, calls } = fakeAccounts(() => json({ id: 'u1', dietary }))
+  assert.deepEqual((await client.me('token')).dietary, [])
+  dietary = ['HALAL'] // saved in Profile a moment later
+  assert.deepEqual((await client.me('token')).dietary, [])
+  assert.deepEqual((await client.me('token', null, { fresh: true })).dietary, ['HALAL'])
+  assert.deepEqual((await client.me('token')).dietary, ['HALAL']) // and the fresh answer is the one kept
+  assert.equal(calls.length, 2)
+})
+
 // The warm-up (routes/warm.js) only needs to know the service is awake.
 test('ping: any answer means the account service is awake, even a 401', async () => {
   const asked = []

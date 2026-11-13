@@ -25,6 +25,7 @@ import com.makanmatch.catalog_service.common.ApiExceptionHandler;
 import com.makanmatch.catalog_service.config.SecurityConfig;
 import com.makanmatch.catalog_service.menu.dto.MenuScanResponse;
 import com.makanmatch.catalog_service.menu.dto.ScannedDish;
+import com.makanmatch.catalog_service.security.AccountClient;
 import com.makanmatch.catalog_service.security.Caller;
 
 @WebMvcTest(MenuScanController.class)
@@ -40,6 +41,8 @@ class MenuScanControllerTest {
 
 	@MockitoBean
 	MenuScanService scans;
+	@MockitoBean
+	AccountClient accounts;
 	@MockitoBean
 	JwtDecoder jwtDecoder;
 

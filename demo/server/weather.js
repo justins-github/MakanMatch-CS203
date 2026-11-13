@@ -98,6 +98,25 @@ export function createContextSource({ contextServiceUrl = null, fetchImpl = fetc
   }
 }
 
+// Is context-service awake? Any answer counts (this one is a 400: no coordinates, so
+// no forecast is fetched); asking wakes it. A stopped context-service takes longer to
+// start than CONTEXT_TIMEOUT_MS, so without this (routes/warm.js) the first weather
+// lookup after a pause always waits the full timeout and then uses the fallback.
+// Null when the engine reads the weather itself.
+const COLD_START_WAIT_MS = 25_000
+
+export function createContextPing({ contextServiceUrl = null, fetchImpl = fetch, timeoutMs = COLD_START_WAIT_MS } = {}) {
+  if (!contextServiceUrl) return null
+  return async () => {
+    try {
+      await fetchImpl(`${contextServiceUrl}/api/context/weather`, { signal: AbortSignal.timeout(timeoutMs) })
+      return true
+    } catch {
+      return false
+    }
+  }
+}
+
 // The demo's "simulate rain" toggle: a clearly labelled override, never mistaken for live data.
 export function withRainOverride(context, simulateRain) {
   if (!simulateRain) return context

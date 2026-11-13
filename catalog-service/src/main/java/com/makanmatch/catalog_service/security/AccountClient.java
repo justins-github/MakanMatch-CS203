@@ -29,14 +29,19 @@ public class AccountClient {
 	private static final Duration CACHE_FOR = Duration.ofSeconds(30);
 	private static final int MAX_CACHED = 1_000;
 
+	// How long to wait for an answer. On Vercel an idle account-service is stopped and
+	// takes about 13 s to start again, so a shorter wait turns every cold start into a
+	// 503. Matches the engine's wait (demo/server/clients/accountClient.js).
+	private static final Duration COLD_START_WAIT = Duration.ofSeconds(25);
+
 	private final RestClient http;
 	private final Clock clock;
 	private final Map<String, Cached> cache = new ConcurrentHashMap<>();
 
 	public AccountClient(@Value("${account-service.url}") String accountServiceUrl) {
 		JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(
-				HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build());
-		factory.setReadTimeout(Duration.ofSeconds(5));
+				HttpClient.newBuilder().connectTimeout(COLD_START_WAIT).build());
+		factory.setReadTimeout(COLD_START_WAIT);
 		this.http = RestClient.builder().baseUrl(accountServiceUrl).requestFactory(factory).build();
 		this.clock = Clock.systemUTC();
 	}
