@@ -24,8 +24,22 @@ function MeRow({ title, detail, onClick }) {
 export default function Me({ onResetTaste }) {
   const { me, role, logout } = useAuth()
   const [view, setView] = useState('me') // me | venues | admin
+  const [loggingOut, setLoggingOut] = useState(false)
+  const [logoutFailed, setLogoutFailed] = useState(false)
   const runsVenues = role === 'OWNER' || role === 'ADMIN'
   const isAdmin = role === 'ADMIN'
+
+  // On success this screen goes away with the session; only a failure comes back here.
+  const logOut = async () => {
+    setLoggingOut(true)
+    setLogoutFailed(false)
+    try {
+      await logout()
+    } catch {
+      setLogoutFailed(true)
+      setLoggingOut(false)
+    }
+  }
 
   if (view === 'venues' && runsVenues) {
     return (
@@ -66,10 +80,15 @@ export default function Me({ onResetTaste }) {
           <button type="button" className="btn quiet" onClick={onResetTaste} title="Forget what you've taught the AI">
             Reset my taste
           </button>
-          <button type="button" className="btn quiet" onClick={logout}>
+          <button type="button" className="btn quiet" onClick={logOut} disabled={loggingOut}>
             Log out
           </button>
         </div>
+        {logoutFailed && (
+          <div className="error" role="alert">
+            Couldn't log you out, so you're still signed in. Please try again.
+          </div>
+        )}
         <DeleteAccount />
       </div>
     </Profile>

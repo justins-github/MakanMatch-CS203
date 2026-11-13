@@ -40,7 +40,7 @@ import { createReviewBombService } from './services/reviewBombService.js'
 import { createReviewService } from './services/reviewService.js'
 import { fileVectorSource, pgVectorSource } from './services/tasteVectors.js'
 import { loadVectorStore } from './vectors.js'
-import { createContextSource } from './weather.js'
+import { createContextPing, createContextSource } from './weather.js'
 
 if (!config.supabaseUrl) {
   console.error('SUPABASE_URL is not set. Copy .env.example to .env at the repo root and fill it in.')
@@ -76,6 +76,7 @@ console.log(ai.available ? `review reader: Claude (${ai.model})` : 'review reade
 
 // Weather: context-service when it runs, data.gov.sg directly otherwise (and as its fallback).
 const getContext = createContextSource({ contextServiceUrl: config.contextServiceUrl })
+const contextPing = createContextPing({ contextServiceUrl: config.contextServiceUrl })
 console.log(config.contextServiceUrl ? 'weather: context-service, data.gov.sg as fallback' : 'weather: data.gov.sg')
 
 const accounts = createAccountClient({ baseUrl: config.accountServiceUrl })
@@ -92,13 +93,15 @@ const reviewBomb = createReviewBombService({ accounts, reviews, learners, regist
 const authenticated = requireAuth({
   verifyToken: createTokenVerifier({ supabaseUrl: config.supabaseUrl, jwtSecret: config.jwtSecret }),
   accounts,
+  // Find applies dietary dealbreakers, so a diet saved a moment ago has to count.
+  needsFreshAccount: (req) => req.path === '/recommendations',
 })
 
 const app = express()
 app.disable('x-powered-by')
 app.use(express.json({ limit: '32kb' }))
 app.use(contextRoutes({ getContext })) // public
-app.use(warmRoutes({ accounts, catalog })) // public
+app.use(warmRoutes({ accounts, catalog, context: contextPing && { ping: contextPing } })) // public
 app.use('/api', authenticated) // everything below needs a signed-in user
 app.use(recommendationRoutes({ recommendations, getContext, months }))
 app.use(locationRoutes({ oneMap: createOneMapClient() }))

@@ -223,7 +223,7 @@ export default function MenuEditor({ venueId }) {
 
       <form className="menu-add" onSubmit={add}>
         <input className="search-input" placeholder="Dish name" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} aria-label="New dish name" />
-        <input className="search-input price-input" type="number" min="0.1" step="0.1" inputMode="decimal" placeholder="Price (S$)" value={price} onChange={(e) => setPrice(e.target.value)} aria-label="New dish price" />
+        <input className="search-input price-input" type="number" min="0.1" step="0.01" inputMode="decimal" placeholder="Price (S$)" value={price} onChange={(e) => setPrice(e.target.value)} aria-label="New dish price" />
         <button type="submit" className="btn go" disabled={!name.trim() || busy}>
           Add dish
         </button>

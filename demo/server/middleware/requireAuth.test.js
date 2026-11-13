@@ -23,9 +23,9 @@ function sign({ issuer = `${SUPABASE}/auth/v1`, audience = 'authenticated', expi
 }
 
 // Runs the middleware against a fake request; resolves with what happened.
-function run(middleware, headers = {}) {
+function run(middleware, headers = {}, path = '/') {
   const lower = Object.fromEntries(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]))
-  const req = { get: (name) => lower[name.toLowerCase()] }
+  const req = { path, get: (name) => lower[name.toLowerCase()] }
   return new Promise((resolve) => {
     const res = {
       status(code) {
@@ -61,6 +61,16 @@ test('the act-as choice is forwarded to account-service, which decides if it app
   const token = await sign()
   await run(requireAuth({ verifyToken, accounts }), { Authorization: `Bearer ${token}`, 'X-Act-As': 'owner' })
   assert.deepEqual(accounts.calls, [{ token, actAs: 'owner' }])
+})
+
+test('a route that must not act on an old answer asks account-service afresh', async () => {
+  const asked = []
+  const accounts = { me: async (_token, _actAs, options) => (asked.push(options?.fresh === true), ME) }
+  const token = await sign()
+  const middleware = requireAuth({ verifyToken, accounts, needsFreshAccount: (req) => req.path === '/recommendations' })
+  await run(middleware, { Authorization: `Bearer ${token}` }, '/recommendations')
+  await run(middleware, { Authorization: `Bearer ${token}` }, '/rankings')
+  assert.deepEqual(asked, [true, false])
 })
 
 test('tokens signed by anyone else are rejected', async () => {

@@ -201,15 +201,25 @@ export default function Review({ active = true, startVenue = null, onReviewSaved
       })
       .catch((err) => setError(err.message))
 
+  // The place chosen right now, for answers that land late: adding a dish can take
+  // 10 s or more while a service wakes up, long enough to have moved on to another place.
+  const venueIdRef = useRef(null)
+  venueIdRef.current = venue?.id ?? null
+  const stillAt = (v) => venueIdRef.current === v.id
+
   // A venue's menu comes from the catalog, with the AI's prediction per dish.
+  // Its answer only counts while that venue is still the chosen one.
   const loadVenue = (v) =>
     getVenueDishes(v.id)
       .then((d) => {
+        if (!stillAt(v)) return
         setVenueDishes(d.dishes)
         setVenueInfo({ youManage: d.youManageThisVenue, degraded: d.degraded })
         setAccuracy(d.accuracy)
       })
-      .catch((err) => setError(err.message))
+      .catch((err) => {
+        if (stillAt(v)) setError(err.message)
+      })
 
   // Coming back to this tab refreshes the lists; a finished review isn't a draft to keep.
   useEffect(() => {
@@ -333,19 +343,24 @@ export default function Review({ active = true, startVenue = null, onReviewSaved
     }
   }
 
+  // The dish belongs to the venue it was added at. If you've since opened another
+  // place (from a For you card, say), it is still added there, but its review and
+  // any error stay off the place you're looking at now.
   const addDish = async () => {
+    const at = venue
     setBusy(true)
     setError(null)
     try {
       const price = newDishPrice === '' ? null : Number(newDishPrice)
-      const created = await addCatalogDish(venue.id, newDishName.trim(), price)
-      await loadVenue(venue)
-      pickDish({ id: created.id, name: created.name, venueId: venue.id, venueName: venue.name, predictedScore10: null })
-      setAdding(false)
+      const created = await addCatalogDish(at.id, newDishName.trim(), price)
       setNewDishName('')
       setNewDishPrice('')
+      await loadVenue(at)
+      if (!stillAt(at)) return
+      pickDish({ id: created.id, name: created.name, venueId: at.id, venueName: at.name, predictedScore10: null })
+      setAdding(false)
     } catch (err) {
-      setError(err.message)
+      if (stillAt(at)) setError(err.message)
     } finally {
       setBusy(false)
     }
@@ -428,7 +443,7 @@ export default function Review({ active = true, startVenue = null, onReviewSaved
 
       {step === 'dish' && (
         <>
-          <button className="back-link" onClick={() => setStep('search')}>
+          <button className="back-link" disabled={busy} onClick={() => setStep('search')}>
             ← Choose another place
           </button>
           <h2 className="step-title">{venue.name}</h2>
@@ -450,6 +465,7 @@ export default function Review({ active = true, startVenue = null, onReviewSaved
               <button
                 key={d.id}
                 className="venue-row"
+                disabled={busy}
                 onClick={() => pickDish(d)}
               >
                 <span className="venue-row-main">
@@ -485,7 +501,7 @@ export default function Review({ active = true, startVenue = null, onReviewSaved
                 aria-label="New dish price"
               />
               <button className="teach-btn" disabled={!newDishName.trim() || busy} onClick={addDish}>
-                Add and review
+                {busy ? 'Adding…' : 'Add and review'}
               </button>
             </div>
           ) : (

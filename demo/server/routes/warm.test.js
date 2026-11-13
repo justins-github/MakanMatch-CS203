@@ -3,9 +3,11 @@ import assert from 'node:assert/strict'
 import express from 'express'
 import { warmRoutes } from './warm.js'
 
-// GET /api/warm on a throwaway engine whose two services answer pings as given.
-async function warm({ account, catalog }) {
-  const app = express().use(warmRoutes({ accounts: { ping: account }, catalog: { ping: catalog } }))
+// GET /api/warm on a throwaway engine whose services answer pings as given.
+async function warm({ account, catalog, context = null }) {
+  const app = express().use(warmRoutes({
+    accounts: { ping: account }, catalog: { ping: catalog }, context: context && { ping: context },
+  }))
   const server = app.listen(0)
   try {
     const res = await fetch(`http://localhost:${server.address().port}/api/warm`)
@@ -31,4 +33,9 @@ test('pings them at the same time, so two cold starts cost one wait', async () =
   }
   await warm({ account: ping, catalog: ping })
   assert.equal(together, 2)
+})
+
+test('wakes context-service too when the engine uses one', async () => {
+  const got = await warm({ account: async () => true, catalog: async () => true, context: async () => false })
+  assert.deepEqual(got, { status: 200, body: { account: true, catalog: true, context: false } })
 })

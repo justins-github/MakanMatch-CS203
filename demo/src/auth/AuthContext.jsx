@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import * as accounts from '../api/accountApi.js'
 import { configureHttp, setAccessToken, setActAsHeader } from '../api/http.js'
+import { signOut } from './signOut.js'
 
 // The signed-in account for the whole app.
 //   status: 'loading' | 'signedOut' | 'signedIn'
@@ -113,15 +114,18 @@ export function AuthProvider({ children }) {
     async signup(email, password, displayName, dietary) {
       await adoptSession(await accounts.signup(email, password, displayName, dietary))
     },
-    async logout() {
-      try {
-        await accounts.logout()
-      } finally {
-        storeActAs(null)
-        setActAsState(null)
-        setActAsHeader(null)
-        signedOut()
-      }
+    // Throws, still signed in, when the server couldn't end the session (see signOut.js).
+    async logout({ force = false } = {}) {
+      await signOut({
+        endSession: accounts.logout,
+        clearLocal: () => {
+          storeActAs(null)
+          setActAsState(null)
+          setActAsHeader(null)
+          signedOut()
+        },
+        force,
+      })
     },
     // role: 'user' | 'owner' | 'admin'
     async setActAs(role) {

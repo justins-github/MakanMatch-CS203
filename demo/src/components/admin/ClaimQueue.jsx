@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { approveClaim, listClaims, rejectClaim } from '../../api/accountApi.js'
+import { getVenue } from '../../api/catalogApi.js'
 import { useAuth } from '../../auth/AuthContext.jsx'
 import { Accordion, Fold, Unsaved } from '../Accordion.jsx'
+import { claimVenueCheck } from './claimVenue.js'
 
 const FILTERS = [
   { id: 'PENDING', label: 'Waiting' },
@@ -29,24 +31,40 @@ function ClaimCard({ claim, isMine, onDecided }) {
     }
   }
 
+  // A waiting claim is checked against the catalog when it's opened: the name on it
+  // is the claimant's own, and approving goes by the venue id (claimVenue.js).
+  const [lookup, setLookup] = useState(null)
+  const pending = claim.status === 'PENDING'
+  const checkVenue = () => {
+    if (!pending) return
+    setLookup(null)
+    getVenue(claim.venueId)
+      .then((venue) => setLookup({ venue }))
+      .catch((err) => setLookup(err.status === 404 ? { missing: true } : { failed: true }))
+  }
+  const place = claimVenueCheck(claim, lookup)
+
   const who = claim.claimant.displayName ?? 'Unknown account'
   return (
     <li>
       <Fold
         id={claim.id}
         sub
-        title={claim.venueName}
+        title={place.name}
         summary={`${isMine ? 'You' : who} · ${when(claim.createdAt)}`}
         aside={<span className={`pill ${claim.status.toLowerCase()}`}>{claim.status.toLowerCase()}</span>}
+        onOpen={checkVenue}
       >
         <div className="venue-row-meta">
           {who}
           {claim.claimant.username && ` · @${claim.claimant.username}`} · {when(claim.createdAt)} · {claim.venueId}
         </div>
+        {place.address && <div className="venue-row-meta">{place.address}</div>}
+        {place.problem && <div className="error" role="alert">{place.problem}</div>}
         <blockquote className="claim-proof">{claim.proof}</blockquote>
         {claim.rejectReason && <div className="claim-reason">Rejected: “{claim.rejectReason}”</div>}
 
-        {claim.status === 'PENDING' && (
+        {pending && (
           rejecting ? (
             <div className="reject-box">
               <label className="field">
@@ -65,8 +83,8 @@ function ClaimCard({ claim, isMine, onDecided }) {
             </div>
           ) : (
             <div className="row-actions">
-              <button type="button" className="btn go" disabled={busy} onClick={() => decide(() => approveClaim(claim.id))}>
-                Approve: {who} manages {claim.venueName}
+              <button type="button" className="btn go" disabled={busy || !lookup?.venue} onClick={() => decide(() => approveClaim(claim.id))}>
+                {lookup ? `Approve: ${who} manages ${place.name}` : 'Checking the place…'}
               </button>
               <button type="button" className="btn stop" disabled={busy} onClick={() => setRejecting(true)}>
                 Reject…

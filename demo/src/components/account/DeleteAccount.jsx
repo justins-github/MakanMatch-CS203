@@ -58,7 +58,7 @@ export default function DeleteAccount() {
     } catch {
       // no goodbye note, that's all
     }
-    await logout()
+    await logout({ force: true }) // the account is gone, so sign out here whatever the server says
   }
 
   const ready = left <= 0 && password !== '' && !busy

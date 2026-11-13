@@ -3,7 +3,8 @@
 // Only halal and vegetarian are checkable today; allergies, no pork etc. need
 // menu data we don't have yet.
 
-// Halal is a religious rule, so only venues our data tags halal count.
+// Halal is a religious rule, so only venues our data tags halal count: the
+// place's category, its name, or the `halal` tag on the venues we entered by hand.
 const HALAL_NAME = /\bhalal\b|\bmuslim\b/i
 
 const VEGETARIAN_CATEGORIES = new Set(['vegetarian_restaurant', 'vegan_restaurant'])
@@ -33,7 +34,8 @@ const MEAT_ONLY_NAME = new RegExp(
 
 const VEGETARIAN_BOOST = 8
 
-export const isHalal = (venue) => venue.category === 'halal_restaurant' || HALAL_NAME.test(venue.name ?? '')
+export const isHalal = (venue) =>
+  venue.category === 'halal_restaurant' || HALAL_NAME.test(venue.name ?? '') || (venue.tags ?? []).includes('halal')
 
 export const isVegetarianFriendly = (venue) =>
   VEGETARIAN_CATEGORIES.has(venue.category) || venue.cuisine === 'vegetarian' || VEGETARIAN_NAME.test(venue.name ?? '')

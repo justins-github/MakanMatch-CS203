@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.makanmatch.catalog_service.common.ApiExceptionHandler;
 import com.makanmatch.catalog_service.config.SecurityConfig;
 import com.makanmatch.catalog_service.menu.dto.MenuChangesSince.RepricedDish;
+import com.makanmatch.catalog_service.security.AccountClient;
 
 @WebMvcTest(VenueChangesController.class)
 @Import({ SecurityConfig.class, ApiExceptionHandler.class })
@@ -32,6 +33,8 @@ class VenueChangesControllerTest {
 
 	@MockitoBean
 	VenueChangesService changes;
+	@MockitoBean
+	AccountClient accounts;
 	@MockitoBean
 	JwtDecoder jwtDecoder;
 

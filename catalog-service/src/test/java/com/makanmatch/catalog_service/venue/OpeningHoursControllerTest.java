@@ -24,6 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.makanmatch.catalog_service.common.ApiExceptionHandler;
 import com.makanmatch.catalog_service.config.SecurityConfig;
+import com.makanmatch.catalog_service.security.AccountClient;
 import com.makanmatch.catalog_service.security.Caller;
 import com.makanmatch.catalog_service.venue.dto.DayHours;
 import com.makanmatch.catalog_service.venue.dto.OpeningHoursResponse;
@@ -42,6 +43,8 @@ class OpeningHoursControllerTest {
 
 	@MockitoBean
 	OpeningHoursService hours;
+	@MockitoBean
+	AccountClient accounts;
 	@MockitoBean
 	JwtDecoder jwtDecoder;
 

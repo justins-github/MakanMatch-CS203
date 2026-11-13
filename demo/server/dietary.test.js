@@ -12,6 +12,11 @@ test('halal means tagged halal: the category or the name says so', () => {
   assert.equal(isHalal(venue({ name: 'Warung Makan', cuisine: 'malay', category: 'malaysian_restaurant' })), false)
 })
 
+test('a place we tagged halal ourselves counts, whatever its name or category', () => {
+  assert.equal(isHalal(venue({ name: "Turk's Kebab", category: null, tags: ['kebab', 'halal'] })), true)
+  assert.equal(isHalal(venue({ name: 'Rochor Prata House', category: null, tags: ['prata'] })), false)
+})
+
 test('meat-only places are found by category and, for generic ones, by name', () => {
   assert.equal(isMeatOnly(venue({ name: 'Wooloomooloo', category: 'steakhouse' })), true)
   assert.equal(isMeatOnly(venue({ name: "Turk's Kebab", category: 'doner_kebab' })), true)

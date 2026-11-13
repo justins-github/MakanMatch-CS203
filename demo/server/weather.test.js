@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { SMU } from './geo.js'
-import { contextFor, contextFromService, createContextSource, withRainOverride } from './weather.js'
+import { contextFor, contextFromService, createContextPing, createContextSource, withRainOverride } from './weather.js'
 
 const TAMPINES = { lat: 1.3533, lon: 103.9451 }
 const FORECASTS = new Map([['City', 'Partly Cloudy (Day)'], ['Tampines', 'Thundery Showers']])
@@ -96,4 +96,33 @@ test('an unavailable answer from context-service falls back without skipping it'
   assert.equal((await getContext(SMU)).source, 'fallback')
   assert.equal((await getContext(SMU)).source, 'fallback')
   assert.equal(calls, 2)
+})
+
+// The warm-up (routes/warm.js) only needs to know the service is awake.
+test('ping: any answer means context-service is awake, and no forecast is asked for', async () => {
+  const asked = []
+  const ping = createContextPing({
+    contextServiceUrl: 'http://context.internal',
+    fetchImpl: async (url) => { asked.push(url); return { ok: false, status: 400 } },
+  })
+  assert.equal(await ping(), true)
+  assert.deepEqual(asked, ['http://context.internal/api/context/weather'])
+})
+
+test('ping: an unreachable or too-slow context-service is false, not an error', async () => {
+  const down = createContextPing({ contextServiceUrl: 'http://context.internal', fetchImpl: async () => { throw new Error('ECONNREFUSED') } })
+  assert.equal(await down(), false)
+  const slowFetch = (_url, { signal }) => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => resolve({ ok: true }), 300)
+    signal.addEventListener('abort', () => {
+      clearTimeout(timer)
+      reject(signal.reason)
+    })
+  })
+  const slow = createContextPing({ contextServiceUrl: 'http://context.internal', fetchImpl: slowFetch, timeoutMs: 20 })
+  assert.equal(await slow(), false)
+})
+
+test('ping: without CONTEXT_SERVICE_URL there is nothing to wake', () => {
+  assert.equal(createContextPing({ contextServiceUrl: null }), null)
 })
