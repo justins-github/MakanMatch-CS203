@@ -45,6 +45,10 @@ supabase:
 # Who may manage a venue is decided by account-service (GET /api/me).
 account-service:
   url: ${ACCOUNT_SERVICE_URL:http://localhost:8082}
+  # On Vercel that address is HTTPS behind Vercel's own certificate authority, which
+  # it gives the container as a PEM file in SSL_CERT_FILE. Java doesn't read that
+  # variable by itself, so it is passed on here. Unset (empty) everywhere else.
+  ca-bundle: ${SSL_CERT_FILE:}
 
 springdoc:
   swagger-ui:
